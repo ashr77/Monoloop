@@ -8,6 +8,7 @@ import { z } from 'zod';
 import {
   MATERIAL_FAMILIES,
   MATERIAL_SPECIFICATIONS,
+  ALL_SPECIFICATIONS,
   MATERIAL_CONDITIONS,
   LISTING_STATUSES,
   QUANTITY_UNITS,
@@ -28,7 +29,9 @@ export const createListingSchema = z
     material_family: z.enum(MATERIAL_FAMILIES, {
       errorMap: () => ({ message: 'Material family must be STAINLESS_STEEL_SHEET or PLYWOOD_PANEL' }),
     }),
-    material_specification: z.string().min(1, 'Material specification is required'),
+    material_specification: z.enum(ALL_SPECIFICATIONS, {
+      errorMap: () => ({ message: 'Material specification must be a recognized industrial standard' }),
+    }),
     length_mm: z
       .number({ invalid_type_error: 'Length must be a number' })
       .positive('Length must be greater than 0 mm'),
@@ -67,7 +70,7 @@ export type CreateListingInput = z.infer<typeof createListingSchema>;
 export const updateListingSchema = z
   .object({
     material_family: z.enum(MATERIAL_FAMILIES).optional(),
-    material_specification: z.string().min(1).optional(),
+    material_specification: z.enum(ALL_SPECIFICATIONS).optional(),
     length_mm: z.number().positive('Length must be greater than 0 mm').optional(),
     width_mm: z.number().positive('Width must be greater than 0 mm').optional(),
     thickness_mm: z.number().positive('Thickness must be greater than 0 mm').optional(),
