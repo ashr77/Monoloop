@@ -3,7 +3,7 @@
 // TSUNAGU Hackathon 2026 - Member 1
 // ============================================================================
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import {
   createListingSchema,
   isSpecificationValidForFamily,
@@ -11,6 +11,9 @@ import {
 import { listingRepository } from '@/lib/supabase/repository';
 
 describe('Project Foundation & Schema Contracts', () => {
+  beforeAll(() => {
+    listingRepository.setMockMode(true);
+  });
   it('validates correct specification for material family', () => {
     expect(isSpecificationValidForFamily('STAINLESS_STEEL_SHEET', 'SS304')).toBe(true);
     expect(isSpecificationValidForFamily('STAINLESS_STEEL_SHEET', 'SS201')).toBe(true);

@@ -202,26 +202,39 @@ export async function extractMaterialFromText(
     let rawJsonText = '';
 
     if (provider === 'gemini') {
-      const model = process.env.AI_MODEL || 'gemini-1.5-flash';
+      const model = process.env.AI_MODEL || 'gemini-flash-lite-latest';
       const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
-      const res = await fetch(endpoint, {
+      const requestPayload = {
+        contents: [
+          {
+            role: 'user',
+            parts: [{ text: `${SYSTEM_PROMPT}\n\nSUPPLIER TEXT:\n"${prompt}"` }],
+          },
+        ],
+        generationConfig: {
+          responseMimeType: 'application/json',
+          temperature: 0.1,
+        },
+      };
+
+      let res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         signal: controller.signal,
-        body: JSON.stringify({
-          contents: [
-            {
-              role: 'user',
-              parts: [{ text: `${SYSTEM_PROMPT}\n\nSUPPLIER TEXT:\n"${prompt}"` }],
-            },
-          ],
-          generationConfig: {
-            responseMimeType: 'application/json',
-            temperature: 0.1,
-          },
-        }),
+        body: JSON.stringify(requestPayload),
       });
+
+      // Transient spike retry (503 / 429)
+      if (res.status === 503 || res.status === 429) {
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+        res = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          signal: controller.signal,
+          body: JSON.stringify(requestPayload),
+        });
+      }
 
       clearTimeout(timeout);
 

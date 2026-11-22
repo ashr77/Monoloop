@@ -258,7 +258,10 @@ export function ListingFormModal({
 
       const res = await fetch(url, {
         method,
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-organization-id': organizationId,
+        },
         body: JSON.stringify(payload),
       });
 

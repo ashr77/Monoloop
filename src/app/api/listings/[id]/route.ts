@@ -68,6 +68,19 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
     const body = await request.json();
 
+    // Verify caller organization ownership (header or body)
+    const callerOrgId = request.headers.get('x-organization-id') || body.caller_organization_id;
+    if (callerOrgId && callerOrgId !== existing.organization_id) {
+      const response: ApiResponse = {
+        success: false,
+        error: {
+          code: 'FORBIDDEN_ORGANIZATION',
+          message: 'Access denied: You cannot modify a surplus listing owned by another organization.',
+        },
+      };
+      return NextResponse.json(response, { status: 403 });
+    }
+
     // Prevent direct tampering with reserved_quantity or organization_id
     if ('reserved_quantity' in body) {
       const response: ApiResponse = {
