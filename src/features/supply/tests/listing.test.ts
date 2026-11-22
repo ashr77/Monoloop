@@ -9,6 +9,7 @@ import { createListingSchema } from '@/features/supply/schemas/listing.schema';
 
 describe('Supply Management & Inventory Invariants', () => {
   beforeEach(() => {
+    listingRepository.setMockMode(true);
     listingRepository._resetStore();
   });
 

@@ -55,11 +55,15 @@ export function SupplierListingTable({ listings, onEdit, onRefresh }: Props) {
       return;
     }
 
+    const target = listings.find((l) => l.id === id);
     setIsArchivingId(id);
     try {
       const res = await fetch(`/api/listings/${id}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(target?.organization_id ? { 'x-organization-id': target.organization_id } : {}),
+        },
         body: JSON.stringify({ status: 'ARCHIVED' }),
       });
       const data = await res.json();

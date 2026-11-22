@@ -11,6 +11,7 @@ export default defineConfig({
   test: {
     environment: 'node',
     globals: true,
+    setupFiles: ['./src/lib/test-env.ts'],
   },
   resolve: {
     alias: {

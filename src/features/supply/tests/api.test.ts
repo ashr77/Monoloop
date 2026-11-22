@@ -12,6 +12,7 @@ import { listingRepository } from '@/lib/supabase/repository';
 
 describe('Supply APIs & Route Handlers', () => {
   beforeEach(() => {
+    listingRepository.setMockMode(true);
     listingRepository._resetStore();
   });
 
@@ -127,6 +128,50 @@ describe('Supply APIs & Route Handlers', () => {
 
     expect(res.status).toBe(400);
     expect(json.error.code).toBe('INVALID_QUANTITY');
+  });
+
+  it('PATCH /api/listings/[id] rejects modification when caller organization does not match owner', async () => {
+    // Listing c1111111-1111-4111-c111-111111111111 belongs to org a1111111...
+    const req = new NextRequest('http://localhost:3000/api/listings/c1111111-1111-4111-c111-111111111111', {
+      method: 'PATCH',
+      headers: {
+        'x-organization-id': 'a2222222-2222-4222-a222-222222222222', // Mismatching org!
+      },
+      body: JSON.stringify({ unit_price_bdt: 9999 }),
+    });
+
+    const res = await patchListing(req, { params: { id: 'c1111111-1111-4111-c111-111111111111' } });
+    const json = await res.json();
+
+    expect(res.status).toBe(403);
+    expect(json.error.code).toBe('FORBIDDEN_ORGANIZATION');
+  });
+
+  it('POST /api/listings rejects creation when organization is not a SUPPLIER', async () => {
+    // Org b1111111-1111-4111-b111-111111111111 is a BUYER
+    const payload = {
+      organization_id: 'b1111111-1111-4111-b111-111111111111',
+      material_family: 'STAINLESS_STEEL_SHEET',
+      material_specification: 'SS304',
+      length_mm: 2000,
+      width_mm: 1000,
+      thickness_mm: 2,
+      total_quantity: 10,
+      condition: 'UNUSED',
+      unit_price_bdt: 4000,
+      city: 'Dhaka',
+    };
+
+    const req = new NextRequest('http://localhost:3000/api/listings', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+
+    const res = await postListing(req);
+    const json = await res.json();
+
+    expect(res.status).toBe(403);
+    expect(json.error.code).toBe('FORBIDDEN_ROLE');
   });
 
   it('POST /api/ai/extract-material returns structured attributes in mock mode', async () => {

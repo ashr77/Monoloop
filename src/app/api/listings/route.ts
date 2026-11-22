@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
 
     const validData = parseResult.data;
 
-    // Verify organization exists
+    // Verify organization exists and is a supplier
     const organization = await listingRepository.getOrganizationById(validData.organization_id);
     if (!organization) {
       const response: ApiResponse = {
@@ -78,6 +78,17 @@ export async function POST(request: NextRequest) {
         },
       };
       return NextResponse.json(response, { status: 404 });
+    }
+
+    if (organization.organization_type !== 'SUPPLIER' && organization.organization_type !== 'HYBRID') {
+      const response: ApiResponse = {
+        success: false,
+        error: {
+          code: 'FORBIDDEN_ROLE',
+          message: `Organization '${organization.name}' is registered as ${organization.organization_type}. Only SUPPLIER organizations may publish surplus inventory.`,
+        },
+      };
+      return NextResponse.json(response, { status: 403 });
     }
 
     // Create listing (reserved_quantity strictly initialized to 0)
