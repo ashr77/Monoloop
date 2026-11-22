@@ -16,7 +16,7 @@ import { ListingFormModal } from './ListingFormModal';
 
 export function SupplierDashboard() {
   const [listings, setListings] = useState<MaterialListing[]>([]);
-  const [organizations] = useState<Organization[]>(
+  const [organizations, setOrganizations] = useState<Organization[]>(
     DEMO_ORGANIZATIONS as unknown as Organization[]
   );
   const [selectedOrgId, setSelectedOrgId] = useState<string>('ALL');
@@ -24,6 +24,18 @@ export function SupplierDashboard() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingListing, setEditingListing] = useState<MaterialListing | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Load organizations
+  useEffect(() => {
+    fetch('/api/organizations')
+      .then((res) => res.json())
+      .then((json) => {
+        if (json.success && json.data) {
+          setOrganizations(json.data);
+        }
+      })
+      .catch((err) => console.warn('Could not fetch organizations:', err));
+  }, []);
 
   // Fetch listings
   const fetchListings = useCallback(async () => {
