@@ -6,7 +6,6 @@
 import { describe, it, expect } from 'vitest';
 import {
   createListingSchema,
-  updateListingSchema,
   isSpecificationValidForFamily,
 } from '@/features/supply/schemas/listing.schema';
 import { listingRepository } from '@/lib/supabase/repository';
