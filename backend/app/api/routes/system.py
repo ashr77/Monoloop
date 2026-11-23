@@ -7,8 +7,9 @@ from sqlalchemy import text
 
 from app.api.deps import ContainerDep
 from app.schemas.common import ApiResponse, ok
-from app.schemas.inputs import ExtractMaterialRequest
-from app.services.ai.extraction import ExtractionFailed, MaterialExtraction
+from app.schemas.inputs import ExtractMaterialRequest, ExtractRequirementRequest, TranscribeAudioRequest
+from app.services.ai.extraction import ExtractionFailed, MaterialExtraction, RequirementExtraction
+from app.services.ai.transcription import Transcription
 from app.services.matching.engine import ENGINE_VERSION
 
 router = APIRouter(prefix="/api")
@@ -41,5 +42,24 @@ async def extract_material(body: ExtractMaterialRequest, c: ContainerDep):
     200 with success=false (code AI_UNAVAILABLE) so the form falls back to manual entry."""
     try:
         return ok(await c.extraction.extract(body.prompt, mock=bool(body.mock)))
+    except ExtractionFailed as exc:
+        return {"success": False, "error": {"code": "AI_UNAVAILABLE", "message": str(exc)}}
+
+
+@router.post("/ai/transcribe", response_model=ApiResponse[Transcription], tags=["supply"])
+async def transcribe_audio(body: TranscribeAudioRequest, c: ContainerDep):
+    """Speech-to-text fallback for the voice listing assistant (browsers without the Web Speech API).
+    Accepts a short base64 recording in English, Bangla or Japanese. Failures return 200 with
+    success=false (code AI_UNAVAILABLE) so the supplier can type instead."""
+    try:
+        return ok(await c.transcription.transcribe(body.audio_base64, body.mime_type, body.language))
+    except ExtractionFailed as exc:
+        return {"success": False, "error": {"code": "AI_UNAVAILABLE", "message": str(exc)}}
+
+
+@router.post("/ai/extract-requirement", response_model=ApiResponse[RequirementExtraction], tags=["demand"])
+async def extract_requirement(body: ExtractRequirementRequest, c: ContainerDep):
+    try:
+        return ok(await c.extraction.extract_requirement(body.prompt, mock=bool(body.mock)))
     except ExtractionFailed as exc:
         return {"success": False, "error": {"code": "AI_UNAVAILABLE", "message": str(exc)}}

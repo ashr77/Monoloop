@@ -7,7 +7,7 @@ import type { MaterialListing, MaterialRequirement, Organization } from '@/lib/t
 import type { MatchResult } from '@/features/matching/types';
 import type { ExchangeAction, ExchangeView } from '@/features/exchanges/types';
 import type { ImpactReport } from '@/features/analytics/impact';
-import type { MaterialExtractionResult } from '@/lib/ai/schemas';
+import type { MaterialExtractionResult, RequirementExtractionResult, SpeechLanguage } from '@/lib/ai/schemas';
 import { apiRequest } from './client';
 
 export interface ListingFilters {
@@ -137,6 +137,17 @@ export const api = {
   ai: {
     extractMaterial: (prompt: string, mock?: boolean) =>
       apiRequest<MaterialExtractionResult>('/api/ai/extract-material', {
+        method: 'POST',
+        body: mock === undefined ? { prompt } : { prompt, mock },
+        timeoutMs: 30_000,
+      }).then((r) => r.data),
+    /** Server-side speech-to-text fallback for browsers without the Web Speech API. */
+    transcribe: (body: TranscribeAudioInput) =>
+      apiRequest<TranscriptionResult>('/api/ai/transcribe', { method: 'POST', body, timeoutMs: 45_000 }).then(
+        (r) => r.data
+      ),
+    extractRequirement: (prompt: string, mock?: boolean) =>
+      apiRequest<RequirementExtractionResult>('/api/ai/extract-requirement', {
         method: 'POST',
         body: mock === undefined ? { prompt } : { prompt, mock },
         timeoutMs: 30_000,

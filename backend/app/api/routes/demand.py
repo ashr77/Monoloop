@@ -7,8 +7,8 @@ from typing import Annotated
 from fastapi import APIRouter, Path, Query, Request, status
 
 from app.api.deps import ContainerDep
-from app.core.security import require_actor, resolve_actor
 from app.core.errors import AppError
+from app.core.security import require_actor, resolve_actor
 from app.domain.constants import MaterialFamily, RequirementStatus
 from app.repositories.base import RequirementFilter
 from app.schemas.common import ApiResponse, ok

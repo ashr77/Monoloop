@@ -218,3 +218,23 @@ class ExchangeAction(StrictInput):
 class ExtractMaterialRequest(StrictInput):
     prompt: Annotated[str, StringConstraints(min_length=5, max_length=2000)]
     mock: bool | None = None
+
+
+class TranscribeAudioRequest(StrictInput):
+    audio_base64: Annotated[str, StringConstraints(min_length=16, max_length=20_000_000)]
+    mime_type: Annotated[str, StringConstraints(max_length=80)]
+    language: Literal["en-US", "bn-BD", "ja-JP"] = "en-US"
+
+    @field_validator("mime_type")
+    @classmethod
+    def _base_mime(cls, value: str) -> str:
+        # MediaRecorder reports e.g. "audio/webm;codecs=opus"; providers want the bare type.
+        base = value.split(";")[0].strip().lower()
+        if base not in AUDIO_MIME_TYPES:
+            raise ValueError(f"Unsupported audio format. Use one of: {', '.join(AUDIO_MIME_TYPES)}")
+        return base
+
+
+class ExtractRequirementRequest(StrictInput):
+    prompt: Annotated[str, StringConstraints(min_length=5, max_length=2000)]
+    mock: bool | None = None

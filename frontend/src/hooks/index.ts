@@ -6,4 +6,8 @@ export { useMatch, useMatchesOverview } from './useMatches';
 export { useExchanges, useRequestExchange, useRequestListingOrder, useExchangeAction } from './useExchanges';
 export { useImpact } from './useImpact';
 export { useExtractMaterial } from './useExtractMaterial';
+export { useTranscribeAudio } from './useTranscribeAudio';
+export { useVoiceInput } from './useVoiceInput';
+export type { VoiceInputMode, VoiceInputStatus } from './useVoiceInput';
+export { useExtractRequirement } from './useExtractRequirement';
 export { queryKeys } from './queryKeys';

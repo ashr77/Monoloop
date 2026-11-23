@@ -283,6 +283,28 @@ def _parse_model_json(raw: str) -> MaterialExtraction:
         raise ExtractionFailed("AI extracted attributes did not conform to required specification schema.") from exc
 
 
+def _parse_requirement_json(raw: str) -> RequirementExtraction:
+    cleaned = re.sub(r"```json\n?|\n?```", "", raw).strip()
+    try:
+        result = RequirementExtraction.model_validate(json.loads(cleaned))
+    except (json.JSONDecodeError, ValidationError) as exc:
+        logger.warning("Buyer AI output failed schema validation: %s", exc)
+        raise ExtractionFailed("AI extracted buyer attributes did not conform to the requirement schema.") from exc
+    if result.material_family and result.material_specification not in MATERIAL_SPECIFICATIONS.get(
+        result.material_family, ()
+    ):
+        raise ExtractionFailed("AI extracted an unsupported material specification.")
+    for name in ("length", "width", "thickness"):
+        minimum = getattr(result, f"{name}_min_mm")
+        maximum = getattr(result, f"{name}_max_mm")
+        if minimum is not None and maximum is not None and minimum > maximum:
+            raise ExtractionFailed("AI extracted a dimension range whose minimum exceeds its maximum.")
+    return result
+
+
+_TRANSIENT = frozenset({429, 500, 502, 503, 504})
+
+
 class _HttpExtractor:
     def __init__(self, settings: Settings, client: httpx.AsyncClient):
         self.settings = settings
@@ -484,4 +506,26 @@ class ExtractionService:
         if not self.settings.ai_configured:
             raise ExtractionFailed("AI extraction service is not configured. Please enter listing details manually "
                                    "or configure AI_API_KEY in backend/.env.")
-        return await self._provider().extract(prompt)
+        try:
+            return (await self._provider().extract(prompt)).model_copy(update={"source": "ai"})
+        except ExtractionFailed as exc:
+            # Provider down or overloaded: the offline parser (English, Bangla, Japanese) still fills
+            # what it can. If it finds nothing useful, report the original failure instead.
+            fallback = extract_with_heuristics(prompt)
+            if len(fallback.missing_fields) > 6:
+                raise
+            logger.warning("AI extraction failed (%s); using heuristic fallback", exc)
+            return fallback.model_copy(update={"raw_notes": f"{exc} Filled by the offline parser instead: "
+                                                            "review every field carefully."})
+
+    async def extract_requirement(self, prompt: str, mock: bool = False) -> RequirementExtraction:
+        if mock:
+            return extract_requirement_with_heuristics(prompt)
+        if not self.settings.ai_configured:
+            raise ExtractionFailed("AI extraction service is not configured. Please enter requirement details manually "
+                                   "or configure AI_API_KEY in backend/.env.")
+        if self.settings.ai_provider == "openai":
+            extractor = BuyerOpenAIExtractor(self.settings, self.client)
+        else:
+            extractor = BuyerGeminiExtractor(self.settings, self.client)
+        return await extractor.extract(prompt)
