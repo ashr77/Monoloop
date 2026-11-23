@@ -8,6 +8,7 @@ import type { MaterialRequirement } from '@/lib/types';
 import type { MatchResult } from '../types';
 import { PALETTE, SPEC_LABEL, SUPPLIER_COLORS, bdt, num, t, unitNoun } from './theme';
 import { EvaluationTable } from './EvaluationTable';
+import { RequestExchangeButton } from '@/features/exchanges/components/RequestExchangeButton';
 
 interface Props {
   requirement: MaterialRequirement;
@@ -305,9 +306,11 @@ function ActionBar({ requirement, result }: Props) {
           Back to requirements
         </Link>
         {canRequest ? (
-          <span className={t.btnDisabled} title="Exchange requests are created by the exchange module." aria-disabled>
-            Request exchange <ArrowRight className="size-4" />
-          </span>
+          <RequestExchangeButton
+            requirementId={requirement.id}
+            buyerOrganizationId={requirement.organization_id}
+            className={t.btnInk}
+          />
         ) : (
           <Link href="/demand" className={t.btnInk} aria-label={`Adjust requirement ${requirement.id}`}>
             Adjust requirement <ArrowRight className="size-4" />
