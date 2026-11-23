@@ -1,0 +1,59 @@
+# MONOLOOP backend (FastAPI) on Render - Blueprint (render.com/docs/blueprint-spec)
+# Dashboard -> New -> Blueprint -> pick this repo. Render asks for every `sync: false`
+# value on the first deploy; secrets never live in this file.
+# The frontend deploys separately on Vercel (root directory: frontend).
+
+services:
+  - type: web
+    name: monoloop-api
+    runtime: python
+    rootDir: backend
+    region: singapore
+    plan: free  # free instances sleep after 15 min idle; first request then takes ~50 s
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.3
+      - key: ENVIRONMENT
+        value: production
+      - key: AUTH_MODE
+        value: demo
+
+      # Data: Supabase over REST (no database password needed)
+      - key: DATA_BACKEND
+        value: supabase
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+
+      # AI material extraction
+      - key: AI_PROVIDER
+        value: gemini
+      - key: AI_MODEL
+        value: gemini-flash-lite-latest
+      - key: AI_API_KEY
+        sync: false
+
+      # Payments: SSLCommerz sandbox
+      - key: PAYMENT_PROVIDER
+        value: sslcommerz
+      - key: SSLCOMMERZ_SANDBOX
+        value: "true"
+      - key: SSLCOMMERZ_STORE_ID
+        sync: false
+      - key: SSLCOMMERZ_STORE_PASSWORD
+        sync: false
+
+      # Public URLs: fill in after both services exist, e.g.
+      #   PUBLIC_API_URL = https://monoloop-api.onrender.com
+      #   FRONTEND_URL / CORS_ORIGINS = https://<your-app>.vercel.app
+      - key: PUBLIC_API_URL
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
