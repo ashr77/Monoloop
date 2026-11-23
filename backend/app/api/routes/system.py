@@ -32,7 +32,8 @@ async def health(c: ContainerDep):
         except Exception:  # noqa: BLE001
             database = "unreachable"
     return ok({"status": "ok", "data_backend": c.repos.backend, "database": database,
-               "engine_version": ENGINE_VERSION, "ai_configured": c.settings.ai_configured})
+               "engine_version": ENGINE_VERSION, "ai_configured": c.settings.ai_configured,
+               "payment_configured": c.payments.enabled})
 
 
 @router.post("/ai/extract-material", response_model=ApiResponse[MaterialExtraction], tags=["supply"])

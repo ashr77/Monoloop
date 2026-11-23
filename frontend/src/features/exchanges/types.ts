@@ -39,6 +39,27 @@ export interface ExchangeItemView extends ExchangeItemRecord {
   supplier?: Organization;
 }
 
+/** Online payment for an exchange (SSLCommerz sandbox; backend migration 00005). */
+export type PaymentStatus = 'INITIATED' | 'PAID' | 'FAILED' | 'CANCELLED';
+
+export interface PaymentSummary {
+  status: PaymentStatus;
+  provider: string;
+  tran_id: string;
+  amount_bdt: number;
+  card_type?: string | null;
+  paid_at?: string | null;
+}
+
+export interface PaymentStart {
+  payment_id: string;
+  tran_id: string;
+  amount_bdt: number;
+  currency: string;
+  gateway_url: string;
+  sandbox: boolean;
+}
+
 export interface ExchangeView extends Exchange {
   stage: ExchangeStage;
   items: ExchangeItemView[];
@@ -48,6 +69,9 @@ export interface ExchangeView extends Exchange {
   total_quantity: number;
   total_value_bdt: number;
   counts: { pending: number; accepted: number; rejected: number; completed: number; cancelled: number };
+  /** True when the server requires payment before the transfer can be confirmed. */
+  payment_required?: boolean;
+  payment?: PaymentSummary | null;
 }
 
 export interface CreateExchangeItemInput {

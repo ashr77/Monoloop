@@ -43,6 +43,7 @@ class InMemoryStore:
         self.exchanges: dict[str, ExchangeRecord] = {}
         self.items: dict[str, ExchangeItemRecord] = {}
         self.logs: list[ActivityLog] = []
+        self.payments: dict = {}  # tran_id -> PaymentRecord (repositories/memory/payments.py)
 
     # Read helpers return copies so callers can never mutate the store through a result.
     def listing_view(self, listing: Listing) -> Listing:

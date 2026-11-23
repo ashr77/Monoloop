@@ -12,24 +12,41 @@ from app.domain.constants import EXCHANGE_STATUSES
 from app.repositories.base import ExchangeActionName, ExchangeFilter, NewExchangeItem, Repositories
 from app.schemas.exchange import ExchangeView
 from app.schemas.matching import MatchResult
+from app.schemas.payment import PaymentSummary
 from app.services.matching.service import MatchingService
+from app.services.payments.service import PaymentService
 
 
 class ExchangeService:
-    def __init__(self, repos: Repositories, matching: MatchingService):
+    def __init__(self, repos: Repositories, matching: MatchingService, payments: PaymentService | None = None):
         self.repos = repos
         self.matching = matching
+        self.payments = payments
+
+    @property
+    def _payment_on(self) -> bool:
+        return self.payments is not None and self.payments.enabled
+
+    async def _with_payments(self, views: list[ExchangeView]) -> list[ExchangeView]:
+        if not self._payment_on or not views:
+            return views
+        latest = await self.payments.latest_by_exchange([v.id for v in views])
+        for v in views:
+            v.payment_required = True
+            if v.id in latest:
+                v.payment = PaymentSummary.of(latest[v.id])
+        return views
 
     async def list(self, organization_id: str | None, status: str | None) -> list[ExchangeView]:
         if status and status not in EXCHANGE_STATUSES:
             raise AppError("VALIDATION_ERROR", f"Unknown status '{status}'.")
-        return await self.repos.exchanges.list(ExchangeFilter(organization_id, status))
+        return await self._with_payments(await self.repos.exchanges.list(ExchangeFilter(organization_id, status)))
 
     async def get(self, exchange_id: str) -> ExchangeView:
         view = await self.repos.exchanges.get(exchange_id)
         if not view:
             raise AppError("NOT_FOUND", f"Exchange {exchange_id} was not found.")
-        return view
+        return (await self._with_payments([view]))[0]
 
     async def request_from_match(self, requirement_id: str, buyer_id: str) -> tuple[ExchangeView, MatchResult]:
         outcome = await self.matching.match(requirement_id)
@@ -55,5 +72,12 @@ class ExchangeService:
     async def act(self, action: ExchangeActionName, exchange_id: str, actor_id: str, item_id: str | None) -> ExchangeView:
         if action in ("accept", "reject") and not item_id:
             raise AppError("VALIDATION_ERROR", "exchange_item_id (UUID) is required.")
+        if self._payment_on and action in ("complete", "cancel"):
+            paid = exchange_id in await self.payments.paid_exchange_ids([exchange_id])
+            if action == "complete" and not paid:
+                raise AppError("PAYMENT_REQUIRED", "Pay for the exchange before confirming the transfer.")
+            if action == "cancel" and paid:
+                raise AppError("INVALID_STATE", "This exchange is paid; cancelling would need a refund, "
+                                                "which this prototype does not support.")
         await self.repos.exchanges.act(action, exchange_id, actor_id, item_id)
         return await self.get(exchange_id)

@@ -97,3 +97,34 @@ The SQL functions in `00004` were also run against a real PostgreSQL engine (PGl
 
 - After a partial completion the requirement stays `OPEN`. A follow-up match is computed against the full `required_quantity`, not the remainder.
 - Identity is the demo `x-organization-id` header. There is no production authentication.
+
+---
+
+## 7. Payment (SSLCommerz)
+
+The buyer pays the material value of a **reserved** exchange before confirming the transfer.
+
+```
+Reserved ──"Pay ৳…"──▶ SSLCommerz checkout ──▶ /api/payments/sslcommerz/success
+        ──backend validates val_id with the gateway──▶ PAID ──"Confirm transfer"──▶ Completed
+```
+
+| Item | Location |
+| :-- | :-- |
+| Migration | `supabase/migrations/00005_payments.sql` (table `payments`, one PAID per exchange) |
+| Gateway (Strategy) | `backend/app/services/payments/gateway.py` (`SSLCommerzGateway`) |
+| Rules | `backend/app/services/payments/service.py` |
+| API | `POST /api/payments/exchanges/{id}`, `POST /api/payments/sslcommerz/{success,fail,cancel,ipn}` |
+| Tests | `backend/tests/test_payments.py` |
+
+- **Never trusts the redirect.** On success or IPN the backend calls the SSLCommerz validation API with `val_id`. It marks the payment PAID only if status, `tran_id`, amount and currency (BDT) all match. Forged or tampered callbacks end as FAILED.
+- **Counted once.** INITIATED → PAID is a conditional update, and a unique index allows one PAID payment per exchange. Duplicate callbacks are harmless.
+- **Rules when payment is on:** completing requires PAID (`409 PAYMENT_REQUIRED`). A paid exchange cannot be cancelled, because refunds are out of scope.
+- **Off by default.** With `PAYMENT_PROVIDER=none`, exchanges complete without payment, exactly as before.
+
+**Setup:**
+1. Run `00005_payments.sql`.
+2. In `backend/.env` set `PAYMENT_PROVIDER=sslcommerz`, `SSLCOMMERZ_STORE_ID` and `SSLCOMMERZ_STORE_PASSWORD`, and keep `SSLCOMMERZ_SANDBOX=true`.
+3. Sandbox test card: VISA `4111 1111 1111 1111`, CVV `111`, any future expiry, OTP `111111`.
+
+The IPN reaches the backend only when `PUBLIC_API_URL` is public. Locally, the success redirect does the validation.

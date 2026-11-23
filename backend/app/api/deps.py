@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 
 from app.core.config import Settings
 from app.repositories.base import Repositories
+from app.repositories.memory.payments import MemoryPaymentRepository
 from app.repositories.memory.repositories import (
     MemoryExchangeRepository,
     MemoryListingRepository,
@@ -28,6 +29,8 @@ from app.services.demand import RequirementService
 from app.services.exchange import ExchangeService
 from app.services.impact import ImpactService
 from app.services.matching.service import MatchingService
+from app.services.payments.gateway import PaymentGateway, SSLCommerzGateway
+from app.services.payments.service import PaymentService
 from app.services.supply import ListingService, OrganizationService
 
 
@@ -45,7 +48,8 @@ class Container:
         self.listings = ListingService(self.repos)
         self.requirements = RequirementService(self.repos)
         self.matching = MatchingService(self.repos)
-        self.exchanges = ExchangeService(self.repos, self.matching)
+        self.payments = PaymentService(self.repos, self.settings, build_gateway(self.settings, self.http))
+        self.exchanges = ExchangeService(self.repos, self.matching, self.payments)
         self.impact = ImpactService(self.repos)
         self.extraction = ExtractionService(self.settings, self.http)
 
@@ -57,6 +61,14 @@ class Container:
             await self.engine.dispose()
 
 
+def build_gateway(settings: Settings, http: httpx.AsyncClient) -> PaymentGateway | None:
+    """Payment gateway (Strategy) from settings; None keeps online payment switched off."""
+    if not settings.payment_configured:
+        return None
+    return SSLCommerzGateway(http, settings.sslcommerz_store_id, settings.sslcommerz_store_password,
+                             sandbox=settings.sslcommerz_sandbox)
+
+
 def memory_repositories(store: InMemoryStore) -> Repositories:
     return Repositories(
         organizations=MemoryOrganizationRepository(store),
@@ -64,10 +76,12 @@ def memory_repositories(store: InMemoryStore) -> Repositories:
         requirements=MemoryRequirementRepository(store),
         exchanges=MemoryExchangeRepository(store),
         backend="memory",
+        payments=MemoryPaymentRepository(store),
     )
 
 
 def postgres_repositories(engine: AsyncEngine) -> Repositories:
+    from app.repositories.postgres.payments import PgPaymentRepository
     from app.repositories.postgres.repositories import (
         PgExchangeRepository,
         PgListingRepository,
@@ -81,10 +95,12 @@ def postgres_repositories(engine: AsyncEngine) -> Repositories:
         requirements=PgRequirementRepository(engine),
         exchanges=PgExchangeRepository(engine),
         backend="postgres",
+        payments=PgPaymentRepository(engine),
     )
 
 
 def supabase_repositories(rest: httpx.AsyncClient) -> Repositories:
+    from app.repositories.supabase.payments import SupabasePaymentRepository
     from app.repositories.supabase.repositories import (
         SupabaseExchangeRepository,
         SupabaseListingRepository,
@@ -98,6 +114,7 @@ def supabase_repositories(rest: httpx.AsyncClient) -> Repositories:
         requirements=SupabaseRequirementRepository(rest),
         exchanges=SupabaseExchangeRepository(rest),
         backend="supabase",
+        payments=SupabasePaymentRepository(rest),
     )
 
 

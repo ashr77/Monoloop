@@ -15,6 +15,7 @@ from app.schemas.entities import (
     Organization,
     Requirement,
 )
+from app.schemas.payment import PaymentSummary
 
 ExchangeStage = Literal["AWAITING_SUPPLIERS", "SUPPLIER_DECLINED", "RESERVED", "COMPLETED", "CANCELLED"]
 
@@ -42,6 +43,9 @@ class ExchangeView(ExchangeRecord):
     total_quantity: int
     total_value_bdt: float
     counts: ExchangeCounts
+    # Filled by ExchangeService when online payment is enabled (Member 4, migration 00005).
+    payment: PaymentSummary | None = None
+    payment_required: bool = False
 
 
 def derive_stage(status: str, item_statuses: list[str]) -> ExchangeStage:
