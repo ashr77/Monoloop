@@ -1,8 +1,9 @@
 """Repository interfaces (Repository pattern + dependency inversion).
 
-Services depend only on these Protocols. Two implementations exist:
+Services depend only on these Protocols. Three implementations exist:
     memory/    demo + tests: seeded in-process store, atomic via an asyncio lock
-    postgres/  Supabase PostgreSQL via SQLAlchemy async + asyncpg
+    postgres/  Supabase PostgreSQL via SQLAlchemy async + asyncpg (needs the DB password)
+    supabase/  Supabase REST (PostgREST) with the service-role key; atomic via the 00004 RPCs
 The concrete set is chosen once at startup by app.api.deps (Factory).
 """
 
@@ -86,4 +87,4 @@ class Repositories:
     listings: ListingRepository
     requirements: RequirementRepository
     exchanges: ExchangeRepository
-    backend: Literal["memory", "postgres"]
+    backend: Literal["memory", "postgres", "supabase"]

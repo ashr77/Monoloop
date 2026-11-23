@@ -25,6 +25,12 @@ async def health(c: ContainerDep):
             database = "ok"
         except Exception:  # noqa: BLE001 - health must report, not raise
             database = "unreachable"
+    elif c.rest is not None:
+        try:
+            r = await c.rest.get("/organizations", params={"select": "id", "limit": "1"})
+            database = "ok" if r.status_code == 200 else "unreachable"
+        except Exception:  # noqa: BLE001
+            database = "unreachable"
     return ok({"status": "ok", "data_backend": c.repos.backend, "database": database,
                "engine_version": ENGINE_VERSION, "ai_configured": c.settings.ai_configured})
 

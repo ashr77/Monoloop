@@ -18,8 +18,13 @@ class Settings(BaseSettings):
     # --- Data -----------------------------------------------------------------
     # Supabase "Session pooler" URI (postgresql://...:5432/postgres). Empty = in-memory demo data.
     database_url: str = ""
-    # "auto" uses Postgres when DATABASE_URL is set, otherwise the in-memory store.
-    data_backend: Literal["auto", "memory", "postgres"] = "auto"
+    # "auto": Postgres when DATABASE_URL is set, else Supabase REST when SUPABASE_URL and
+    # SUPABASE_SERVICE_ROLE_KEY are set, else the in-memory store.
+    data_backend: Literal["auto", "memory", "postgres", "supabase"] = "auto"
+    # Supabase REST access (used when the database password is not available).
+    # The service-role key bypasses row-level security: backend only, never in the frontend.
+    supabase_url: str = ""
+    supabase_service_role_key: str = ""
     db_pool_size: int = Field(default=10, ge=1, le=50)
     db_max_overflow: int = Field(default=5, ge=0, le=50)
     db_statement_timeout_ms: int = Field(default=8000, ge=100)
@@ -54,9 +59,21 @@ class Settings(BaseSettings):
     def use_postgres(self) -> bool:
         if self.data_backend == "postgres":
             return True
-        if self.data_backend == "memory":
+        if self.data_backend in ("memory", "supabase"):
             return False
         return bool(self.database_url.strip())
+
+    @property
+    def supabase_rest_configured(self) -> bool:
+        return bool(self.supabase_url.strip()) and bool(self.supabase_service_role_key.strip())
+
+    @property
+    def use_supabase_rest(self) -> bool:
+        if self.data_backend == "supabase":
+            return True
+        if self.data_backend == "auto":
+            return not self.database_url.strip() and self.supabase_rest_configured
+        return False
 
     @property
     def async_database_url(self) -> str:
