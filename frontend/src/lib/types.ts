@@ -61,6 +61,12 @@ export interface MaterialRequirement {
   length_mm: number;
   width_mm: number;
   thickness_mm: number;
+  length_min_mm?: number | null;
+  length_max_mm?: number | null;
+  width_min_mm?: number | null;
+  width_max_mm?: number | null;
+  thickness_min_mm?: number | null;
+  thickness_max_mm?: number | null;
   required_quantity: number;
   quantity_unit: QuantityUnit;
   maximum_budget_bdt?: number | null;

@@ -20,6 +20,29 @@ class ExchangeService:
         self.repos = repos
         self.matching = matching
 
+    async def request_listing(self, listing_id: str, quantity: int | None, buyer_id: str) -> ExchangeView:
+        if quantity is None or isinstance(quantity, bool) or quantity <= 0:
+            raise AppError("VALIDATION_ERROR", "Requested quantity must be a positive whole number.")
+        listing = await self.repos.listings.get(listing_id)
+        if not listing:
+            raise AppError("NOT_FOUND", "Listing was not found.")
+        if listing.status != "ACTIVE":
+            raise AppError("LISTING_UNAVAILABLE", f"Listing is {listing.status} and cannot be ordered.")
+        available = listing.total_quantity - listing.reserved_quantity
+        if available <= 0:
+            raise AppError("INSUFFICIENT_STOCK", "This listing has no available quantity.")
+        if quantity > available:
+            raise AppError(
+                "INSUFFICIENT_STOCK",
+                f"Only {available} piece(s) are still available.",
+                {"available": available, "requested": quantity},
+            )
+        if listing.organization_id == buyer_id:
+            raise AppError("VALIDATION_ERROR", "A buyer cannot order its own listing.")
+        exchange_id = await self.repos.exchanges.create_listing_order(listing_id, quantity, buyer_id)
+        view = await self.get(exchange_id)
+        return view
+
     async def list(self, organization_id: str | None, status: str | None) -> list[ExchangeView]:
         if status and status not in EXCHANGE_STATUSES:
             raise AppError("VALIDATION_ERROR", f"Unknown status '{status}'.")

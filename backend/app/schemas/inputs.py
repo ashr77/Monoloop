@@ -117,9 +117,15 @@ class RequirementCreate(StrictInput):
     organization_id: UuidStr
     material_family: MaterialFamily
     material_specification: MaterialSpecification
-    length_mm: Mm
-    width_mm: Mm
-    thickness_mm: Mm
+    length_mm: Mm | None = None
+    width_mm: Mm | None = None
+    thickness_mm: Mm | None = None
+    length_min_mm: Mm | None = None
+    length_max_mm: Mm | None = None
+    width_min_mm: Mm | None = None
+    width_max_mm: Mm | None = None
+    thickness_min_mm: Mm | None = None
+    thickness_max_mm: Mm | None = None
     required_quantity: Pieces
     quantity_unit: QuantityUnit = "PIECE"
     maximum_budget_bdt: Bdt | None = None
@@ -132,6 +138,20 @@ class RequirementCreate(StrictInput):
         _check_spec(self.material_family, self.material_specification)
         return self
 
+    @model_validator(mode="after")
+    def _dimension_ranges(self) -> Self:
+        for name in ("length", "width", "thickness"):
+            minimum = getattr(self, f"{name}_min_mm")
+            maximum = getattr(self, f"{name}_max_mm")
+            exact = getattr(self, f"{name}_mm")
+            if minimum is not None and maximum is not None and minimum > maximum:
+                raise ValueError(f"{name.capitalize()} minimum cannot exceed maximum")
+            if maximum is not None and minimum is None:
+                raise ValueError(f"{name.capitalize()} minimum is required when a range maximum is provided")
+            if exact is not None and (minimum is not None or maximum is not None):
+                raise ValueError(f"{name.capitalize()} exact value cannot be combined with range values")
+        return self
+
 
 class RequirementUpdate(StrictInput):
     material_family: MaterialFamily | None = None
@@ -139,6 +159,12 @@ class RequirementUpdate(StrictInput):
     length_mm: Mm | None = None
     width_mm: Mm | None = None
     thickness_mm: Mm | None = None
+    length_min_mm: Mm | None = None
+    length_max_mm: Mm | None = None
+    width_min_mm: Mm | None = None
+    width_max_mm: Mm | None = None
+    thickness_min_mm: Mm | None = None
+    thickness_max_mm: Mm | None = None
     required_quantity: Pieces | None = None
     maximum_budget_bdt: Bdt | None = None
     allow_split_suppliers: bool | None = None
@@ -153,6 +179,20 @@ class RequirementUpdate(StrictInput):
         _check_spec(self.material_family, self.material_specification)
         return self
 
+    @model_validator(mode="after")
+    def _dimension_ranges(self) -> Self:
+        for name in ("length", "width", "thickness"):
+            minimum = getattr(self, f"{name}_min_mm")
+            maximum = getattr(self, f"{name}_max_mm")
+            exact = getattr(self, f"{name}_mm")
+            if minimum is not None and maximum is not None and minimum > maximum:
+                raise ValueError(f"{name.capitalize()} minimum cannot exceed maximum")
+            if maximum is not None and minimum is None:
+                raise ValueError(f"{name.capitalize()} minimum is required when a range maximum is provided")
+            if exact is not None and (minimum is not None or maximum is not None):
+                raise ValueError(f"{name.capitalize()} exact value cannot be combined with range values")
+        return self
+
     def changes(self) -> dict:
         return self.model_dump(exclude_unset=True, exclude=_NOT_WRITABLE)
 
@@ -161,8 +201,10 @@ class RequirementUpdate(StrictInput):
 
 
 class ExchangeCreate(StrictInput):
-    requirement_id: UuidStr
+    requirement_id: UuidStr | None = None
     buyer_organization_id: UuidStr
+    listing_id: UuidStr | None = None
+    quantity: Pieces | None = None
 
 
 class ExchangeAction(StrictInput):
@@ -176,18 +218,3 @@ class ExchangeAction(StrictInput):
 class ExtractMaterialRequest(StrictInput):
     prompt: Annotated[str, StringConstraints(min_length=5, max_length=2000)]
     mock: bool | None = None
-
-
-class TranscribeAudioRequest(StrictInput):
-    audio_base64: Annotated[str, StringConstraints(min_length=16, max_length=20_000_000)]
-    mime_type: Annotated[str, StringConstraints(max_length=80)]
-    language: Literal["en-US", "bn-BD", "ja-JP"] = "en-US"
-
-    @field_validator("mime_type")
-    @classmethod
-    def _base_mime(cls, value: str) -> str:
-        # MediaRecorder reports e.g. "audio/webm;codecs=opus"; providers want the bare type.
-        base = value.split(";")[0].strip().lower()
-        if base not in AUDIO_MIME_TYPES:
-            raise ValueError(f"Unsupported audio format. Use one of: {', '.join(AUDIO_MIME_TYPES)}")
-        return base

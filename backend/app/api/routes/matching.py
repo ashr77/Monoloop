@@ -4,11 +4,12 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Path
+from fastapi import APIRouter, Path, Request
 from pydantic import BaseModel
 
 from app.api.deps import ContainerDep
 from app.core.errors import AppError
+from app.core.security import resolve_actor
 from app.schemas.common import ApiResponse, ok
 from app.schemas.entities import Requirement
 from app.schemas.matching import MatchResult
@@ -41,12 +42,15 @@ async def evaluation():
     response_model=ApiResponse[MatchResult],
     responses={404: {"description": "Requirement not found"}, 409: {"description": "Requirement is not OPEN"}},
 )
-async def match_requirement(requirement_id: Annotated[str, Path(max_length=64)], c: ContainerDep):
+async def match_requirement(requirement_id: Annotated[str, Path(max_length=64)], request: Request, c: ContainerDep):
     """Compatible suppliers, the optimal allocation, estimated delivered cost and the reason behind
     every acceptance or rejection. A proposal is not a reservation."""
     outcome = await c.matching.match(requirement_id)
     if outcome.kind == "NOT_FOUND":
         raise AppError("NOT_FOUND", f"Requirement '{requirement_id}' was not found.")
+    actor = await resolve_actor(request, c.settings)
+    if actor and outcome.requirement and outcome.requirement.organization_id != actor:
+        raise AppError("FORBIDDEN_ORGANIZATION", "You cannot view another buyer's requirement matches.")
     if outcome.kind == "NOT_OPEN":
         raise AppError("REQUIREMENT_NOT_OPEN",
                        f"Requirement is {outcome.requirement.status}; only OPEN requirements are matched.",

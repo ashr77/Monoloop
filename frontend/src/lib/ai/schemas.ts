@@ -33,12 +33,3 @@ export const extractMaterialRequestSchema = z.object({
 });
 
 export type ExtractMaterialRequest = z.infer<typeof extractMaterialRequestSchema>;
-
-/** Spoken languages for voice input (BCP-47), mirrored by the backend's TranscribeAudioRequest. */
-export const SPEECH_LANGUAGES = [
-  { code: 'en-US', label: 'English', name: 'English' },
-  { code: 'bn-BD', label: 'বাংলা', name: 'Bangla' },
-  { code: 'ja-JP', label: '日本語', name: 'Japanese' },
-] as const;
-
-export type SpeechLanguage = (typeof SPEECH_LANGUAGES)[number]['code'];

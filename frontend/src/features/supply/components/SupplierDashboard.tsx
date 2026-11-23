@@ -21,6 +21,7 @@ export function SupplierDashboard() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingListing, setEditingListing] = useState<MaterialListing | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [buyerOrganizationId, setBuyerOrganizationId] = useState('');
 
   // Data comes from the FastAPI backend through cached hooks (src/hooks).
   const orgsQuery = useOrganizations();
@@ -162,6 +163,9 @@ export function SupplierDashboard() {
             listings={listings}
             onEdit={handleOpenEdit}
             onRefresh={fetchListings}
+            organizations={organizations}
+            buyerOrganizationId={buyerOrganizationId}
+            onBuyerOrganizationChange={setBuyerOrganizationId}
           />
         )}
       </div>

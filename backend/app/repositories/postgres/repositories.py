@@ -306,6 +306,24 @@ class PgExchangeRepository:
         except DBAPIError as exc:
             raise translate_db_error(exc) from exc
 
+    async def create_listing_order(self, listing_id: str, quantity: int, buyer_id: str) -> str:
+        sql = text("""
+            SELECT create_direct_listing_order(
+                CAST(:listing AS uuid),
+                CAST(:buyer AS uuid),
+                CAST(:quantity AS integer)
+            )
+        """)
+        try:
+            async with self.engine.begin() as conn:
+                return str((await conn.execute(sql, {
+                    "listing": listing_id,
+                    "buyer": buyer_id,
+                    "quantity": quantity,
+                })).scalar_one())
+        except DBAPIError as exc:
+            raise translate_db_error(exc) from exc
+
     async def act(self, action: ExchangeActionName, exchange_id: str, actor_id: str, item_id: str | None) -> None:
         if not is_uuid(exchange_id):
             raise AppError("NOT_FOUND", f"Exchange {exchange_id} was not found.")
