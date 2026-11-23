@@ -50,4 +50,9 @@ npm run build
 
 ## 👥 Architecture & Team Boundaries
 
-Refer to [TEAM_CONTRACTS.md](file:///E:/Monoloop/docs/TEAM_CONTRACTS.md) for full contracts, database migrations, shared types, and module boundaries.
+Refer to [TEAM_CONTRACTS.md](docs/TEAM_CONTRACTS.md) for full contracts, database migrations, shared types, and module boundaries.
+
+- Matching engine: [docs/MATCHING.md](docs/MATCHING.md)
+- Exchanges, atomic reservation & impact: [docs/EXCHANGES.md](docs/EXCHANGES.md)
+
+**Database:** apply `supabase/migrations/00001` → `00004` in order (`00004_exchange_workflow.sql` adds the atomic exchange functions).
