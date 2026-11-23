@@ -51,11 +51,13 @@ export interface MaterialListing {
 }
 
 // --- Material Requirements (Demand Feature - Member 2) ---
+export type DemandMaterialSpecification = MaterialSpecification;
+
 export interface MaterialRequirement {
   id: string;
   organization_id: string;
   material_family: MaterialFamily;
-  material_specification: MaterialSpecification;
+  material_specification: DemandMaterialSpecification;
   length_mm: number;
   width_mm: number;
   thickness_mm: number;
