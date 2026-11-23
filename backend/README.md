@@ -6,7 +6,7 @@ Every API endpoint of MONOLOOP: supply, demand, explainable matching, exchanges 
 python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
 cp .env.example .env
 .venv/bin/uvicorn app.main:app --reload --port 8000     # interactive docs: http://localhost:8000/docs
-.venv/bin/pytest                                         # 69 tests (+1 opt-in live test)
+.venv/bin/pytest                                         # 85 tests (+1 opt-in live test)
 .venv/bin/ruff check app tests
 ```
 
@@ -37,6 +37,7 @@ app/
 │   ├── supply.py · demand.py · exchange.py · impact.py
 │   ├── matching/           rules (Strategy) → costs → allocation → engine; service; evaluation
 │   └── ai/extraction.py    Heuristic / Gemini / OpenAI extractors (Strategy) behind a Facade
+│       ai/transcription.py voice fallback: Gemini / OpenAI speech-to-text behind a Facade
 ├── repositories/
 │   ├── base.py             Protocol interfaces (Repository pattern, dependency inversion)
 │   ├── memory/             in-process store + exchange state machine (lock = transaction)
@@ -80,6 +81,7 @@ Every response uses the envelope `{ "success", "data", "error": { "code", "messa
 | POST | `/api/exchanges/{id}/complete` · `/cancel` | M4 | buyer only |
 | GET | `/api/impact` | M4 | only COMPLETED exchanges count as reuse |
 | POST | `/api/ai/extract-material` | M1 | `{prompt, mock?}`; provider failure → `success:false`, `AI_UNAVAILABLE` |
+| POST | `/api/ai/transcribe` | M1 | `{audio_base64, mime_type, language: en-US\|bn-BD\|ja-JP}`; voice fallback for browsers without the Web Speech API; own body limit (`MAX_AUDIO_BYTES`); failure → `AI_UNAVAILABLE` |
 
 ## Speed and efficiency
 
@@ -114,4 +116,5 @@ Every response uses the envelope `{ "success", "data", "error": { "code", "messa
 | `test_engine_parity.py` | the Python engine reproduces the original TypeScript engine output on all 18 recorded cases |
 | `test_matching_engine.py` | plan tests T4–T8, rotation, own listings, budgets, optimality against brute force (300 random cases), greedy fallback, evaluation metrics |
 | `test_api.py` | T1–T3, T9, every endpoint, the full 50 + 30 exchange flow (stock deducted, requirement FULFILLED, impact), reject/cancel releases stock |
+| `test_voice.py` | Bangla/Japanese mock extraction, transcription soft failures, strict input, per-route audio body limit |
 | `test_security.py` | headers, CORS, rate limit, body limit, UUID identity, injection, error hygiene, JWT mode, production docs |

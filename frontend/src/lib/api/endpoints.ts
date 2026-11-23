@@ -7,7 +7,7 @@ import type { MaterialListing, MaterialRequirement, Organization } from '@/lib/t
 import type { MatchResult } from '@/features/matching/types';
 import type { ExchangeAction, ExchangeView } from '@/features/exchanges/types';
 import type { ImpactReport } from '@/features/analytics/impact';
-import type { MaterialExtractionResult } from '@/lib/ai/schemas';
+import type { MaterialExtractionResult, SpeechLanguage } from '@/lib/ai/schemas';
 import { apiRequest } from './client';
 
 export interface ListingFilters {
@@ -37,6 +37,17 @@ export interface ExchangeFilters {
 export interface MatchOverviewRow {
   requirement: MaterialRequirement;
   result: MatchResult;
+}
+
+export interface TranscribeAudioInput {
+  audio_base64: string;
+  mime_type: string;
+  language: SpeechLanguage;
+}
+
+export interface TranscriptionResult {
+  transcript: string;
+  language: SpeechLanguage;
 }
 
 export type ListingInput = Record<string, unknown>;
@@ -120,5 +131,10 @@ export const api = {
         body: mock === undefined ? { prompt } : { prompt, mock },
         timeoutMs: 30_000,
       }).then((r) => r.data),
+    /** Server-side speech-to-text fallback for browsers without the Web Speech API. */
+    transcribe: (body: TranscribeAudioInput) =>
+      apiRequest<TranscriptionResult>('/api/ai/transcribe', { method: 'POST', body, timeoutMs: 45_000 }).then(
+        (r) => r.data
+      ),
   },
 };
