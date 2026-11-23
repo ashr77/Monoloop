@@ -38,6 +38,7 @@ class Container:
     http: httpx.AsyncClient
     engine: AsyncEngine | None = None
     store: InMemoryStore | None = None
+    rest: httpx.AsyncClient | None = None  # Supabase REST client (service-role key)
 
     def __post_init__(self) -> None:
         self.organizations = OrganizationService(self.repos)
@@ -50,6 +51,8 @@ class Container:
 
     async def aclose(self) -> None:
         await self.http.aclose()
+        if self.rest is not None:
+            await self.rest.aclose()
         if self.engine is not None:
             await self.engine.dispose()
 
@@ -81,8 +84,32 @@ def postgres_repositories(engine: AsyncEngine) -> Repositories:
     )
 
 
+def supabase_repositories(rest: httpx.AsyncClient) -> Repositories:
+    from app.repositories.supabase.repositories import (
+        SupabaseExchangeRepository,
+        SupabaseListingRepository,
+        SupabaseOrganizationRepository,
+        SupabaseRequirementRepository,
+    )
+
+    return Repositories(
+        organizations=SupabaseOrganizationRepository(rest),
+        listings=SupabaseListingRepository(rest),
+        requirements=SupabaseRequirementRepository(rest),
+        exchanges=SupabaseExchangeRepository(rest),
+        backend="supabase",
+    )
+
+
 def build_container(settings: Settings) -> Container:
     http = httpx.AsyncClient(limits=httpx.Limits(max_connections=20, max_keepalive_connections=10))
+    if settings.use_supabase_rest:
+        if not settings.supabase_rest_configured:
+            raise RuntimeError("DATA_BACKEND=supabase needs SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in backend/.env")
+        from app.repositories.supabase.repositories import create_rest_client
+
+        rest = create_rest_client(settings.supabase_url, settings.supabase_service_role_key)
+        return Container(settings, supabase_repositories(rest), http, rest=rest)
     if settings.use_postgres:
         from app.db.session import create_engine
 

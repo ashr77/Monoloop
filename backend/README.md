@@ -6,16 +6,21 @@ Every API endpoint of MONOLOOP: supply, demand, explainable matching, exchanges 
 python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
 cp .env.example .env
 .venv/bin/uvicorn app.main:app --reload --port 8000     # interactive docs: http://localhost:8000/docs
-.venv/bin/pytest                                         # 58 tests
+.venv/bin/pytest                                         # 69 tests (+1 opt-in live test)
 .venv/bin/ruff check app tests
 ```
 
 ## Data backends
 
-| `DATABASE_URL` | Backend | Use |
+| Settings in `backend/.env` | Backend (`DATA_BACKEND`) | Use |
 | :-- | :-- | :-- |
-| empty | in-memory store seeded from `app/seed/seed_data.json` | demo, tests, frontend work without a database |
-| Supabase **Session pooler** URI (port 5432) | PostgreSQL via SQLAlchemy async + asyncpg | real data |
+| nothing set | `memory`: in-memory store seeded from `app/seed/seed_data.json` | demo, tests, frontend work without a database |
+| `DATABASE_URL` = Supabase **Session pooler** URI (port 5432) | `postgres`: SQLAlchemy async + asyncpg | real data (needs the database password) |
+| `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` | `supabase`: Supabase REST (PostgREST) over HTTPS | real data without the database password |
+
+With `DATA_BACKEND=auto`: Postgres if `DATABASE_URL` is set, otherwise Supabase REST if both `SUPABASE_` values are set, otherwise memory. The `supabase` backend calls the same migration `00004` functions through `/rpc`, so every reservation is still one atomic database transaction. The service-role key bypasses row-level security, so it belongs in `backend/.env` only.
+
+Live check of the `supabase` backend (writes one CANCELLED exchange, leaves stock unchanged): `MONOLOOP_LIVE_SUPABASE=1 .venv/bin/pytest tests/test_supabase_live.py`
 
 Apply `../supabase/migrations/00001` → `00004` first. The schema lives only in those migrations; `app/repositories/postgres/tables.py` describes it and never alters it. `GET /api/health` reports the active backend and whether the database answers.
 
