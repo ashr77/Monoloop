@@ -45,7 +45,16 @@ class Settings(BaseSettings):
     ai_api_key: str = ""
     ai_model: str = ""
     ai_endpoint: str = ""
-    ai_timeout_seconds: float = Field(default=12.0, gt=0, le=60)
+    ai_timeout_seconds: float = Field(default=10.0, gt=0, le=60)  # per attempt
+    # Hosted models return 503 "overloaded" fairly often: retry with backoff inside one overall budget,
+    # which must stay under the frontend's 30 s request timeout.
+    ai_max_attempts: int = Field(default=3, ge=1, le=5)
+    ai_total_timeout_seconds: float = Field(default=24.0, gt=0, le=120)
+    ai_retry_backoff_seconds: float = Field(default=0.8, ge=0, le=10)
+    # Voice input fallback (browsers without the Web Speech API upload a short recording).
+    ai_transcribe_model: str = ""
+    ai_transcribe_endpoint: str = ""
+    max_audio_bytes: int = Field(default=1_500_000, ge=10_000, le=15_000_000)
 
     @field_validator("cors_origins", mode="before")
     @classmethod
@@ -83,6 +92,11 @@ class Settings(BaseSettings):
             if url.startswith(prefix):
                 return "postgresql+asyncpg://" + url[len(prefix):]
         return url
+
+    @property
+    def max_transcribe_body_bytes(self) -> int:
+        """Base64 adds a third, plus room for the JSON wrapper."""
+        return self.max_audio_bytes * 4 // 3 + 4096
 
     @property
     def ai_configured(self) -> bool:

@@ -21,6 +21,8 @@ export const materialExtractionSchema = z.object({
   raw_notes: z.string().optional().nullable(),
   missing_fields: z.array(z.string()).default([]),
   confidence_scores: z.record(z.string(), z.enum(['HIGH', 'MEDIUM', 'LOW', 'NONE'])).default({}),
+  /** 'ai' = hosted model; 'heuristic' = offline parser (mock mode or the AI service failed). */
+  source: z.enum(['ai', 'heuristic']).default('ai'),
 });
 
 export type MaterialExtractionResult = z.infer<typeof materialExtractionSchema>;
@@ -31,3 +33,12 @@ export const extractMaterialRequestSchema = z.object({
 });
 
 export type ExtractMaterialRequest = z.infer<typeof extractMaterialRequestSchema>;
+
+/** Spoken languages for voice input (BCP-47), mirrored by the backend's TranscribeAudioRequest. */
+export const SPEECH_LANGUAGES = [
+  { code: 'en-US', label: 'English', name: 'English' },
+  { code: 'bn-BD', label: 'বাংলা', name: 'Bangla' },
+  { code: 'ja-JP', label: '日本語', name: 'Japanese' },
+] as const;
+
+export type SpeechLanguage = (typeof SPEECH_LANGUAGES)[number]['code'];

@@ -55,7 +55,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.include_router(module.router)
 
     # Added innermost first; the last one added runs first on each request.
-    app.add_middleware(BodySizeLimitMiddleware, max_bytes=settings.max_body_bytes)
+    app.add_middleware(BodySizeLimitMiddleware, max_bytes=settings.max_body_bytes,
+                       path_limits={"/api/ai/transcribe": settings.max_transcribe_body_bytes})
     app.add_middleware(RateLimitMiddleware, reads_per_minute=settings.rate_limit_per_minute,
                        writes_per_minute=settings.rate_limit_writes_per_minute)
     app.add_middleware(GZipMiddleware, minimum_size=1024)

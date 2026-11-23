@@ -103,15 +103,18 @@ class SecurityHeadersMiddleware:
 
 
 class BodySizeLimitMiddleware:
-    def __init__(self, app: ASGIApp, max_bytes: int):
+    def __init__(self, app: ASGIApp, max_bytes: int, path_limits: dict[str, int] | None = None):
         self.app = app
         self.max_bytes = max_bytes
+        # Exact-path overrides, e.g. the voice upload route takes a larger body than JSON forms.
+        self.path_limits = path_limits or {}
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http":
             return await self.app(scope, receive, send)
+        max_bytes = self.path_limits.get(scope.get("path", ""), self.max_bytes)
         declared = dict(scope["headers"]).get(b"content-length")
-        if declared and declared.isdigit() and int(declared) > self.max_bytes:
+        if declared and declared.isdigit() and int(declared) > max_bytes:
             return await _send_json(send, 413, error_body("PAYLOAD_TOO_LARGE", "Request body is too large."))
 
         # Streamed (chunked) bodies: stop reading past the limit and replace whatever response the
@@ -124,7 +127,7 @@ class BodySizeLimitMiddleware:
             message = await receive()
             if message["type"] == "http.request":
                 state["received"] += len(message.get("body", b""))
-                if state["received"] > self.max_bytes:
+                if state["received"] > max_bytes:
                     state["too_large"] = True
                     return {"type": "http.disconnect"}
             return message
