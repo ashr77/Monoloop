@@ -23,6 +23,15 @@ export function useRequestExchange() {
   });
 }
 
+export function useRequestListingOrder() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { listingId: string; quantity: number; buyerOrganizationId: string }) =>
+      api.exchanges.requestListing(v.listingId, v.quantity, v.buyerOrganizationId),
+    onSuccess: () => invalidateInventory(qc),
+  });
+}
+
 export function useExchangeAction() {
   const qc = useQueryClient();
   return useMutation({

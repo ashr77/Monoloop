@@ -31,3 +31,23 @@ export const extractMaterialRequestSchema = z.object({
 });
 
 export type ExtractMaterialRequest = z.infer<typeof extractMaterialRequestSchema>;
+
+export const requirementExtractionSchema = z.object({
+  material_family: z.enum(MATERIAL_FAMILIES).nullable(),
+  material_specification: z.string().nullable(),
+  length_min_mm: z.number().positive().nullable(),
+  length_max_mm: z.number().positive().nullable(),
+  width_min_mm: z.number().positive().nullable(),
+  width_max_mm: z.number().positive().nullable(),
+  thickness_min_mm: z.number().positive().nullable(),
+  thickness_max_mm: z.number().positive().nullable(),
+  required_quantity: z.number().int().positive().nullable(),
+  quantity_unit: z.enum(QUANTITY_UNITS).default('PIECE'),
+  maximum_budget_bdt: z.number().nonnegative().nullable(),
+  condition_requirement: z.enum(['ANY', 'UNUSED', 'LEFTOVER', 'OFFCUT']).default('ANY'),
+  allow_split_suppliers: z.boolean().default(true),
+  missing_fields: z.array(z.string()).default([]),
+  confidence_scores: z.record(z.string(), z.enum(['HIGH', 'MEDIUM', 'LOW', 'NONE'])).default({}),
+});
+
+export type RequirementExtractionResult = z.infer<typeof requirementExtractionSchema>;

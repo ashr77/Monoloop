@@ -164,6 +164,10 @@ class MemoryExchangeRepository:
         async with self.s.lock:
             return workflow.create_exchange_request(self.s, requirement_id, buyer_id, items)
 
+    async def create_listing_order(self, listing_id: str, quantity: int, buyer_id: str) -> str:
+        async with self.s.lock:
+            return workflow.create_listing_order(self.s, listing_id, quantity, buyer_id)
+
     async def act(self, action: ExchangeActionName, exchange_id: str, actor_id: str, item_id: str | None) -> None:
         async with self.s.lock:
             if action == "accept":

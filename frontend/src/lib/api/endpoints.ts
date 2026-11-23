@@ -7,7 +7,7 @@ import type { MaterialListing, MaterialRequirement, Organization } from '@/lib/t
 import type { MatchResult } from '@/features/matching/types';
 import type { ExchangeAction, ExchangeView } from '@/features/exchanges/types';
 import type { ImpactReport } from '@/features/analytics/impact';
-import type { MaterialExtractionResult } from '@/lib/ai/schemas';
+import type { MaterialExtractionResult, RequirementExtractionResult } from '@/lib/ai/schemas';
 import { apiRequest } from './client';
 
 export interface ListingFilters {
@@ -62,8 +62,8 @@ export const api = {
   },
 
   requirements: {
-    list: (filters: RequirementFilters = {}, signal?: AbortSignal) =>
-      apiRequest<MaterialRequirement[]>('/api/requirements', { query: { ...filters }, signal }).then((r) => ({
+    list: (filters: RequirementFilters = {}, signal?: AbortSignal, organizationId?: string) =>
+      apiRequest<MaterialRequirement[]>('/api/requirements', { query: { ...filters }, signal, organizationId }).then((r) => ({
         items: r.data,
         meta: (r.meta ?? {}) as RequirementListMeta,
       })),
@@ -82,8 +82,8 @@ export const api = {
     overview: (signal?: AbortSignal) =>
       apiRequest<MatchOverviewRow[]>('/api/matches', { signal }).then((r) => r.data),
     /** Match result plus the requirement it was computed for. */
-    get: (requirementId: string, signal?: AbortSignal) =>
-      apiRequest<MatchResult>(`/api/matches/${enc(requirementId)}`, { signal }).then((r) => ({
+    get: (requirementId: string, signal?: AbortSignal, organizationId?: string) =>
+      apiRequest<MatchResult>(`/api/matches/${enc(requirementId)}`, { signal, organizationId }).then((r) => ({
         result: r.data,
         requirement: (r.meta as { requirement?: MaterialRequirement } | undefined)?.requirement,
       })),
@@ -98,6 +98,16 @@ export const api = {
       apiRequest<ExchangeView>('/api/exchanges', {
         method: 'POST',
         body: { requirement_id: requirementId, buyer_organization_id: buyerOrganizationId },
+        organizationId: buyerOrganizationId,
+      }).then((r) => r.data),
+    requestListing: (listingId: string, quantity: number, buyerOrganizationId: string) =>
+      apiRequest<ExchangeView>('/api/exchanges', {
+        method: 'POST',
+        body: {
+          listing_id: listingId,
+          quantity,
+          buyer_organization_id: buyerOrganizationId,
+        },
         organizationId: buyerOrganizationId,
       }).then((r) => r.data),
     act: (exchangeId: string, action: ExchangeAction, organizationId: string, itemId?: string) =>
@@ -116,6 +126,12 @@ export const api = {
   ai: {
     extractMaterial: (prompt: string, mock?: boolean) =>
       apiRequest<MaterialExtractionResult>('/api/ai/extract-material', {
+        method: 'POST',
+        body: mock === undefined ? { prompt } : { prompt, mock },
+        timeoutMs: 30_000,
+      }).then((r) => r.data),
+    extractRequirement: (prompt: string, mock?: boolean) =>
+      apiRequest<RequirementExtractionResult>('/api/ai/extract-requirement', {
         method: 'POST',
         body: mock === undefined ? { prompt } : { prompt, mock },
         timeoutMs: 30_000,

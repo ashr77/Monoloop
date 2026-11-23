@@ -328,6 +328,14 @@ class SupabaseExchangeRepository:
         result = await self.rest.rpc("create_exchange_request", {
             "p_requirement_id": requirement_id, "p_buyer_id": buyer_id, "p_items": payload,
         })
+        return str(result)
+
+    async def create_listing_order(self, listing_id: str, quantity: int, buyer_id: str) -> str:
+        result = await self.rest.rpc("create_direct_listing_order", {
+            "p_listing_id": listing_id,
+            "p_buyer_id": buyer_id,
+            "p_quantity": quantity,
+        })
         # The function returns a uuid; PostgREST sends it as a JSON string.
         return str(result)
 

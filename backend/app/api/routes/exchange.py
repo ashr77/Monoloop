@@ -32,11 +32,15 @@ async def list_exchanges(
 
 @router.post("/exchanges", status_code=status.HTTP_201_CREATED, response_model=ApiResponse[ExchangeView])
 async def request_exchange(body: ExchangeCreate, request: Request, c: ContainerDep):
-    """Request an exchange for a requirement. The allocation is recomputed server-side by the
-    matching engine; stock is reserved only when each supplier accepts."""
+    """Request an exchange for a requirement or directly for a supply listing."""
     actor = await resolve_actor(request, c.settings)
     if actor and actor != body.buyer_organization_id:
         raise AppError("FORBIDDEN_ORGANIZATION", "You can only request exchanges for your own organization.")
+    if body.listing_id is not None:
+        view = await c.exchanges.request_listing(body.listing_id, body.quantity, body.buyer_organization_id)
+        return ok(view)
+    if body.requirement_id is None:
+        raise AppError("VALIDATION_ERROR", "listing_id and quantity are required for direct supply orders.")
     view, proposal = await c.exchanges.request_from_match(body.requirement_id, body.buyer_organization_id)
     return ok(view, matching_status=proposal.matching_status, unfulfilled_quantity=proposal.unfulfilled_quantity)
 

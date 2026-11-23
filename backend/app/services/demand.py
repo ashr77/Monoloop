@@ -52,6 +52,16 @@ class RequirementService:
         if not is_specification_valid_for_family(family, spec):
             raise AppError("VALIDATION_ERROR", "Invalid specification for selected material family",
                            [{"field": "material_specification", "message": "Invalid for the material family"}])
+        for name in ("length", "width", "thickness"):
+            exact = changes.get(f"{name}_mm", getattr(existing, f"{name}_mm"))
+            minimum = changes.get(f"{name}_min_mm", getattr(existing, f"{name}_min_mm"))
+            maximum = changes.get(f"{name}_max_mm", getattr(existing, f"{name}_max_mm"))
+            if exact is not None and (minimum is not None or maximum is not None):
+                raise AppError("VALIDATION_ERROR", f"{name.capitalize()} exact value cannot be combined with range values")
+            if maximum is not None and minimum is None:
+                raise AppError("VALIDATION_ERROR", f"{name.capitalize()} minimum is required when a range maximum is provided")
+            if minimum is not None and maximum is not None and minimum > maximum:
+                raise AppError("VALIDATION_ERROR", f"{name.capitalize()} minimum cannot exceed maximum")
         if not changes:
             return existing
         updated = await self.repos.requirements.update(requirement_id, changes)
