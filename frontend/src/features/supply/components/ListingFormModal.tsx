@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   X,
   Sparkles,
   AlertCircle,
   CheckCircle2,
-  ArrowRight,
+  TriangleAlert,
 } from 'lucide-react';
 import { MaterialListing, Organization } from '@/lib/types';
 import {
@@ -21,6 +21,9 @@ import {
 import { MaterialExtractionResult } from '@/lib/ai/schemas';
 import { useExtractMaterial, useSaveListing } from '@/hooks';
 import { errorMessage } from '@/lib/api/client';
+import { VoiceInputControl } from './VoiceInputControl';
+
+const SUCCESS_MESSAGE_MS = 2500;
 
 interface Props {
   isOpen: boolean;
@@ -74,9 +77,23 @@ export function ListingFormModal({
   // AI Extraction State
   const [aiPrompt, setAiPrompt] = useState('');
   const [isExtracting, setIsExtracting] = useState(false);
-  const [aiResult, setAiResult] = useState<MaterialExtractionResult | null>(null);
   const [aiMessage, setAiMessage] = useState<string | null>(null);
-  const [aiMessageType, setAiMessageType] = useState<'info' | 'error' | 'success'>('info');
+  const [aiMessageType, setAiMessageType] = useState<'error' | 'success' | 'warning'>('success');
+  const aiMessageTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  /** Show a status line; success lines clear themselves after a moment. */
+  const showAiMessage = (type: 'error' | 'success' | 'warning', message: string | null) => {
+    if (aiMessageTimer.current) clearTimeout(aiMessageTimer.current);
+    aiMessageTimer.current = null;
+    setAiMessageType(type);
+    setAiMessage(message);
+    if (type === 'success' && message) {
+      aiMessageTimer.current = setTimeout(() => setAiMessage(null), SUCCESS_MESSAGE_MS);
+    }
+  };
+  useEffect(() => () => {
+    if (aiMessageTimer.current) clearTimeout(aiMessageTimer.current);
+  }, []);
 
   // Submission & Validation State
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -111,9 +128,8 @@ export function ListingFormModal({
       setCity('Gazipur');
       setDescription('');
       setImageUrl('');
-      setAiResult(null);
       setAiPrompt('');
-      setAiMessage(null);
+      showAiMessage('success', null);
     }
     setFormErrors({});
     setGeneralError(null);
@@ -128,28 +144,30 @@ export function ListingFormModal({
     }
   };
 
-  // AI Assistant Extraction Handler
+  // AI Assistant: extract, then fill the form directly for the supplier to review.
   const handleAiExtract = async (useMock = false) => {
     if (!aiPrompt.trim() || aiPrompt.trim().length < 5) {
-      setAiMessage('Please enter a descriptive prompt of at least 5 characters.');
-      setAiMessageType('error');
+      showAiMessage('error', 'Please enter a descriptive prompt of at least 5 characters.');
       return;
     }
 
     setIsExtracting(true);
-    setAiMessage(null);
-    setAiResult(null);
+    showAiMessage('success', null);
 
     try {
       const data = await extractMaterial.mutateAsync({ prompt: aiPrompt, mock: useMock });
-      setAiResult(data);
-      setAiMessageType('success');
-      setAiMessage(
-        `Extracted specifications with AI. Missing ${data.missing_fields.length} unstated fields. Review and click "Apply to Form" below.`
-      );
+      applyExtraction(data);
+      if (data.source === 'heuristic' && !useMock) {
+        showAiMessage(
+          'warning',
+          'The AI service is busy, so the offline parser filled what it could. Please check every field carefully.'
+        );
+      } else {
+        showAiMessage('success', 'Extracted values applied to form! Please review and verify all fields.');
+      }
     } catch (error) {
-      setAiMessageType('error');
-      setAiMessage(
+      showAiMessage(
+        'error',
         errorMessage(error, 'AI extraction could not be completed. You can fill out the form manually below.')
       );
     } finally {
@@ -157,41 +175,32 @@ export function ListingFormModal({
     }
   };
 
-  // Apply AI Extracted Values to Manual Form
-  const handleApplyAiData = () => {
-    if (!aiResult) return;
-
-    if (aiResult.material_family) {
-      setMaterialFamily(aiResult.material_family);
-      if (aiResult.material_specification) {
-        setMaterialSpecification(aiResult.material_specification);
+  const applyExtraction = (result: MaterialExtractionResult) => {
+    if (result.material_family) {
+      setMaterialFamily(result.material_family);
+      const specs: readonly string[] = MATERIAL_SPECIFICATIONS[result.material_family];
+      if (result.material_specification && specs.includes(result.material_specification)) {
+        setMaterialSpecification(result.material_specification);
+      } else if (!specs.includes(materialSpecification)) {
+        setMaterialSpecification(specs[0]);
       }
     }
-    if (aiResult.length_mm !== null) setLengthMm(String(aiResult.length_mm));
-    if (aiResult.width_mm !== null) setWidthMm(String(aiResult.width_mm));
-    if (aiResult.thickness_mm !== null) setThicknessMm(String(aiResult.thickness_mm));
-    if (aiResult.total_quantity !== null) setTotalQuantity(String(aiResult.total_quantity));
-    if (aiResult.condition !== null) setCondition(aiResult.condition);
-    if (aiResult.unit_price_bdt !== null) setUnitPriceBdt(String(aiResult.unit_price_bdt));
-    if (aiResult.city !== null) setCity(aiResult.city);
-    if (aiResult.raw_notes && !description) setDescription(aiPrompt);
-
-    setAiMessage('Extracted values applied to form! Please review and verify all fields.');
-    setAiMessageType('info');
+    if (result.length_mm !== null) setLengthMm(String(result.length_mm));
+    if (result.width_mm !== null) setWidthMm(String(result.width_mm));
+    if (result.thickness_mm !== null) setThicknessMm(String(result.thickness_mm));
+    if (result.total_quantity !== null) setTotalQuantity(String(result.total_quantity));
+    if (result.condition !== null) setCondition(result.condition);
+    if (result.unit_price_bdt !== null) setUnitPriceBdt(String(result.unit_price_bdt));
+    if (result.city !== null) setCity(result.city);
+    if (!description) setDescription(aiPrompt);
   };
 
-  // Pre-fill sample prompts for instant demoing
-  const loadSamplePrompt = (type: 'steel' | 'plywood') => {
-    if (type === 'steel') {
-      setAiPrompt(
-        'We have 40 unused stainless steel sheets, grade SS304, 2mm thick, 1000 by 500 mm, leftover from production. Price is 450 taka per sheet, available in Gazipur.'
-      );
-    } else {
-      setAiPrompt(
-        'Surplus 50 pieces commercial plywood panels, 2440x1220 mm, 18mm thickness, 1850 taka each, brand new condition in Dhaka.'
-      );
-    }
+  // Voice input: append each finished piece of speech to the prompt for review before extraction.
+  const appendTranscript = (text: string) => {
+    setAiPrompt((prev) => (prev.trim() ? `${prev.trimEnd()} ${text}` : text).slice(0, 2000));
+    showAiMessage('success', null);
   };
+
 
   // Submit Handler
   const handleSubmit = async (e: React.FormEvent) => {
@@ -262,14 +271,14 @@ export function ListingFormModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm overflow-y-auto">
-      <div className="relative w-full max-w-3xl bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden my-8">
+      <div className="relative w-full max-w-4xl bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden my-8">
         {/* Modal Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50">
+        <div className="flex items-center justify-between px-8 py-5 border-b border-slate-100 bg-slate-50">
           <div>
-            <h2 className="text-lg font-bold text-slate-900">
+            <h2 className="text-xl font-bold text-slate-900">
               {isEditing ? 'Edit Surplus Material Listing' : 'Publish New Surplus Material Listing'}
             </h2>
-            <p className="text-xs text-slate-500">
+            <p className="text-sm text-slate-500">
               {isEditing
                 ? 'Update specifications or available stock. Reserved stock is strictly protected.'
                 : 'Offer industrial surplus to connected manufacturers. All specifications require verification.'}
@@ -283,7 +292,7 @@ export function ListingFormModal({
           </button>
         </div>
 
-        <div className="p-6 space-y-6 max-h-[80vh] overflow-y-auto">
+        <div className="p-8 space-y-7 max-h-[82vh] overflow-y-auto">
           {/* General Error Banner */}
           {generalError && (
             <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 flex items-center gap-2">
@@ -294,44 +303,30 @@ export function ListingFormModal({
 
           {/* AI SMART LISTING ASSISTANT (Only in Create Mode) */}
           {!isEditing && (
-            <div className="border border-blue-200 bg-gradient-to-br from-blue-50/70 to-indigo-50/40 p-4 rounded-xl space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-blue-900 font-semibold text-sm">
-                  <Sparkles className="w-4 h-4 text-blue-600" />
+            <div className="border border-blue-200 bg-gradient-to-br from-blue-50/70 to-indigo-50/40 p-5 rounded-xl space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2 text-blue-900 font-semibold text-base">
+                  <Sparkles className="w-5 h-5 text-blue-600" />
                   <span>AI Smart Material Listing Assistant</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-blue-700 font-medium">Quick Sample:</span>
-                  <button
-                    type="button"
-                    onClick={() => loadSamplePrompt('steel')}
-                    className="text-xs px-2 py-0.5 rounded bg-blue-100 hover:bg-blue-200 text-blue-800 transition"
-                  >
-                    SS304 Sheet
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => loadSamplePrompt('plywood')}
-                    className="text-xs px-2 py-0.5 rounded bg-blue-100 hover:bg-blue-200 text-blue-800 transition"
-                  >
-                    Plywood
-                  </button>
                 </div>
               </div>
 
-              <p className="text-xs text-slate-600">
-                Describe your excess inventory in plain language (dimensions, grade, quantity, price, location).
-                Our server-side LLM extracts structured attributes for your review.
+              <p className="text-sm text-slate-600">
+                Describe your excess inventory in plain language (dimensions, grade, quantity, price, location),
+                typed or spoken in English, Bangla or Japanese. Our server-side LLM extracts structured attributes
+                for your review.
               </p>
 
               <div className="space-y-2">
                 <textarea
-                  rows={2}
+                  rows={3}
                   value={aiPrompt}
                   onChange={(e) => setAiPrompt(e.target.value)}
                   placeholder="e.g. We have 40 unused stainless steel sheets, grade SS304, 2mm thick, 1000 by 500 mm, leftover from production. Price is 450 taka per sheet in Gazipur."
-                  className="w-full text-xs p-2.5 rounded-lg border border-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                  className="w-full text-base p-3 rounded-lg border border-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                 />
+
+                <VoiceInputControl onTranscript={appendTranscript} disabled={isExtracting} />
 
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -339,16 +334,16 @@ export function ListingFormModal({
                       type="button"
                       disabled={isExtracting}
                       onClick={() => handleAiExtract(false)}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-xs font-semibold rounded-lg shadow-sm transition"
+                      className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-semibold rounded-lg shadow-sm transition"
                     >
-                      <Sparkles className="w-3.5 h-3.5" />
+                      <Sparkles className="w-4 h-4" />
                       <span>{isExtracting ? 'Analyzing Prompt...' : 'Extract with AI'}</span>
                     </button>
                     <button
                       type="button"
                       disabled={isExtracting}
                       onClick={() => handleAiExtract(true)}
-                      className="text-xs text-blue-700 hover:underline px-2 py-1"
+                      className="text-sm text-blue-700 hover:underline px-2 py-1"
                       title="Run with deterministic heuristic simulation without external API key"
                     >
                       (Test with Mock Parser)
@@ -357,59 +352,43 @@ export function ListingFormModal({
                 </div>
               </div>
 
-              {/* AI Status / Result Preview */}
+              {/* AI status: success fades after a moment; warnings and errors stay */}
               {aiMessage && (
                 <div
-                  className={`p-2.5 rounded-lg text-xs flex items-start gap-2 ${
+                  role={aiMessageType === 'error' ? 'alert' : 'status'}
+                  className={`p-3 rounded-lg text-sm flex items-start gap-2 ${
                     aiMessageType === 'error'
                       ? 'bg-red-50 text-red-700 border border-red-200'
-                      : aiMessageType === 'success'
-                      ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-                      : 'bg-blue-100/70 text-blue-800 border border-blue-200'
+                      : aiMessageType === 'warning'
+                      ? 'bg-amber-50 text-amber-800 border border-amber-200'
+                      : 'bg-emerald-50 text-emerald-800 border border-emerald-200'
                   }`}
                 >
                   {aiMessageType === 'error' ? (
                     <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                  ) : aiMessageType === 'warning' ? (
+                    <TriangleAlert className="w-4 h-4 flex-shrink-0 mt-0.5 text-amber-600" />
                   ) : (
                     <CheckCircle2 className="w-4 h-4 flex-shrink-0 mt-0.5 text-emerald-600" />
                   )}
-                  <div className="flex-1">
-                    <p>{aiMessage}</p>
-                    {aiResult && (
-                      <div className="mt-2 pt-2 border-t border-emerald-200 flex flex-wrap gap-2 items-center">
-                        <button
-                          type="button"
-                          onClick={handleApplyAiData}
-                          className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-xs font-bold shadow-sm transition flex items-center gap-1"
-                        >
-                          <span>Apply to Form</span>
-                          <ArrowRight className="w-3.5 h-3.5" />
-                        </button>
-                        <span className="text-[11px] text-slate-500">
-                          Extracted: {aiResult.material_family} ({aiResult.material_specification || 'No spec'}),{' '}
-                          {aiResult.length_mm}x{aiResult.width_mm}x{aiResult.thickness_mm} mm,{' '}
-                          {aiResult.total_quantity} pcs @ {aiResult.unit_price_bdt} BDT
-                        </span>
-                      </div>
-                    )}
-                  </div>
+                  <p className="flex-1">{aiMessage}</p>
                 </div>
               )}
             </div>
           )}
 
           {/* MANUAL SPECIFICATION FORM */}
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-5">
             {/* Supplier Organization */}
             <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+              <label className="block text-sm font-bold text-slate-700 uppercase tracking-wide mb-1.5">
                 Supplier Organization (Demo Profile)
               </label>
               <select
                 disabled={isEditing}
                 value={organizationId}
                 onChange={(e) => setOrganizationId(e.target.value)}
-                className="w-full text-sm p-2.5 rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                className="w-full text-base p-3 rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
               >
                 {organizations
                   .filter((o) => o.organization_type === 'SUPPLIER')
@@ -424,13 +403,13 @@ export function ListingFormModal({
             {/* Material Family & Specification */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                <label className="block text-sm font-bold text-slate-700 uppercase tracking-wide mb-1.5">
                   Material Family <span className="text-red-500">*</span>
                 </label>
                 <select
                   value={materialFamily}
                   onChange={(e) => handleFamilyChange(e.target.value as MaterialFamily)}
-                  className="w-full text-sm p-2.5 rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  className="w-full text-base p-3 rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 >
                   {MATERIAL_FAMILIES.map((fam) => (
                     <option key={fam} value={fam}>
@@ -441,13 +420,13 @@ export function ListingFormModal({
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                <label className="block text-sm font-bold text-slate-700 uppercase tracking-wide mb-1.5">
                   Grade / Technical Specification <span className="text-red-500">*</span>
                 </label>
                 <select
                   value={materialSpecification}
                   onChange={(e) => setMaterialSpecification(e.target.value)}
-                  className="w-full text-sm p-2.5 rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  className="w-full text-base p-3 rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 >
                   {MATERIAL_SPECIFICATIONS[materialFamily].map((spec) => (
                     <option key={spec} value={spec}>
@@ -456,7 +435,7 @@ export function ListingFormModal({
                   ))}
                 </select>
                 {formErrors.material_specification && (
-                  <p className="text-xs text-red-600 mt-1">{formErrors.material_specification}</p>
+                  <p className="text-sm text-red-600 mt-1">{formErrors.material_specification}</p>
                 )}
               </div>
             </div>
@@ -464,7 +443,7 @@ export function ListingFormModal({
             {/* Dimensions (Length, Width, Thickness) */}
             <div className="grid grid-cols-3 gap-3">
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                <label className="block text-sm font-bold text-slate-700 uppercase tracking-wide mb-1.5">
                   Length (mm) <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -473,17 +452,17 @@ export function ListingFormModal({
                   placeholder="e.g. 2400"
                   value={lengthMm}
                   onChange={(e) => setLengthMm(e.target.value)}
-                  className={`w-full text-sm p-2.5 rounded-lg border bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
+                  className={`w-full text-base p-3 rounded-lg border bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
                     formErrors.length_mm ? 'border-red-400 bg-red-50/30' : 'border-slate-300'
                   }`}
                 />
                 {formErrors.length_mm && (
-                  <p className="text-[11px] text-red-600 mt-1">{formErrors.length_mm}</p>
+                  <p className="text-sm text-red-600 mt-1">{formErrors.length_mm}</p>
                 )}
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                <label className="block text-sm font-bold text-slate-700 uppercase tracking-wide mb-1.5">
                   Width (mm) <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -492,17 +471,17 @@ export function ListingFormModal({
                   placeholder="e.g. 1200"
                   value={widthMm}
                   onChange={(e) => setWidthMm(e.target.value)}
-                  className={`w-full text-sm p-2.5 rounded-lg border bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
+                  className={`w-full text-base p-3 rounded-lg border bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
                     formErrors.width_mm ? 'border-red-400 bg-red-50/30' : 'border-slate-300'
                   }`}
                 />
                 {formErrors.width_mm && (
-                  <p className="text-[11px] text-red-600 mt-1">{formErrors.width_mm}</p>
+                  <p className="text-sm text-red-600 mt-1">{formErrors.width_mm}</p>
                 )}
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                <label className="block text-sm font-bold text-slate-700 uppercase tracking-wide mb-1.5">
                   Thickness (mm) <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -511,12 +490,12 @@ export function ListingFormModal({
                   placeholder="e.g. 2.0"
                   value={thicknessMm}
                   onChange={(e) => setThicknessMm(e.target.value)}
-                  className={`w-full text-sm p-2.5 rounded-lg border bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
+                  className={`w-full text-base p-3 rounded-lg border bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
                     formErrors.thickness_mm ? 'border-red-400 bg-red-50/30' : 'border-slate-300'
                   }`}
                 />
                 {formErrors.thickness_mm && (
-                  <p className="text-[11px] text-red-600 mt-1">{formErrors.thickness_mm}</p>
+                  <p className="text-sm text-red-600 mt-1">{formErrors.thickness_mm}</p>
                 )}
               </div>
             </div>
@@ -524,7 +503,7 @@ export function ListingFormModal({
             {/* Quantity & Reserved Stock Information */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                <label className="block text-sm font-bold text-slate-700 uppercase tracking-wide mb-1.5">
                   Total Quantity (Pieces) <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -533,23 +512,23 @@ export function ListingFormModal({
                   placeholder="e.g. 50"
                   value={totalQuantity}
                   onChange={(e) => setTotalQuantity(e.target.value)}
-                  className={`w-full text-sm p-2.5 rounded-lg border bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
+                  className={`w-full text-base p-3 rounded-lg border bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
                     formErrors.total_quantity ? 'border-red-400 bg-red-50/30' : 'border-slate-300'
                   }`}
                 />
                 {formErrors.total_quantity && (
-                  <p className="text-xs text-red-600 mt-1">{formErrors.total_quantity}</p>
+                  <p className="text-sm text-red-600 mt-1">{formErrors.total_quantity}</p>
                 )}
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                <label className="block text-sm font-bold text-slate-700 uppercase tracking-wide mb-1.5">
                   Condition <span className="text-red-500">*</span>
                 </label>
                 <select
                   value={condition}
                   onChange={(e) => setCondition(e.target.value as MaterialCondition)}
-                  className="w-full text-sm p-2.5 rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  className="w-full text-base p-3 rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 >
                   {MATERIAL_CONDITIONS.map((cond) => (
                     <option key={cond} value={cond}>
@@ -562,7 +541,7 @@ export function ListingFormModal({
 
             {/* Reserved Quantity Indicator (For Edit mode) */}
             {isEditing && initialData && (
-              <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800 flex items-center justify-between">
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800 flex items-center justify-between">
                 <span>
                   Currently Reserved Stock: <strong>{initialData.reserved_quantity} pieces</strong>
                 </span>
@@ -575,7 +554,7 @@ export function ListingFormModal({
             {/* Price & Location */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                <label className="block text-sm font-bold text-slate-700 uppercase tracking-wide mb-1.5">
                   Unit Price (BDT / piece) <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -584,23 +563,23 @@ export function ListingFormModal({
                   placeholder="e.g. 4200"
                   value={unitPriceBdt}
                   onChange={(e) => setUnitPriceBdt(e.target.value)}
-                  className={`w-full text-sm p-2.5 rounded-lg border bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
+                  className={`w-full text-base p-3 rounded-lg border bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
                     formErrors.unit_price_bdt ? 'border-red-400 bg-red-50/30' : 'border-slate-300'
                   }`}
                 />
                 {formErrors.unit_price_bdt && (
-                  <p className="text-xs text-red-600 mt-1">{formErrors.unit_price_bdt}</p>
+                  <p className="text-sm text-red-600 mt-1">{formErrors.unit_price_bdt}</p>
                 )}
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                <label className="block text-sm font-bold text-slate-700 uppercase tracking-wide mb-1.5">
                   City / Location <span className="text-red-500">*</span>
                 </label>
                 <select
                   value={city}
                   onChange={(e) => setCity(e.target.value)}
-                  className="w-full text-sm p-2.5 rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  className="w-full text-base p-3 rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 >
                   {BANGLADESH_CITIES.map((c) => (
                     <option key={c} value={c}>
@@ -608,13 +587,13 @@ export function ListingFormModal({
                     </option>
                   ))}
                 </select>
-                {formErrors.city && <p className="text-xs text-red-600 mt-1">{formErrors.city}</p>}
+                {formErrors.city && <p className="text-sm text-red-600 mt-1">{formErrors.city}</p>}
               </div>
             </div>
 
             {/* Description & Optional Image URL */}
             <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+              <label className="block text-sm font-bold text-slate-700 uppercase tracking-wide mb-1.5">
                 Description / Storage Condition
               </label>
               <textarea
@@ -622,12 +601,12 @@ export function ListingFormModal({
                 placeholder="e.g. Stored indoors on pallets, clean edges, factory wrapped."
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                className="w-full text-sm p-2.5 rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                className="w-full text-base p-3 rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+              <label className="block text-sm font-bold text-slate-700 uppercase tracking-wide mb-1.5">
                 Photo URL (Optional human inspection reference)
               </label>
               <input
@@ -635,9 +614,9 @@ export function ListingFormModal({
                 placeholder="https://example.com/images/metal-sheet.jpg"
                 value={imageUrl}
                 onChange={(e) => setImageUrl(e.target.value)}
-                className="w-full text-sm p-2.5 rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                className="w-full text-base p-3 rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
               />
-              <p className="text-[11px] text-slate-400 mt-1">
+              <p className="text-sm text-slate-400 mt-1">
                 Photographs support visual check only; technical specifications are certified by numeric fields above.
               </p>
             </div>
@@ -647,14 +626,14 @@ export function ListingFormModal({
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 rounded-lg border border-slate-300 text-slate-700 text-sm font-medium hover:bg-slate-50 transition"
+                className="px-5 py-2.5 rounded-lg border border-slate-300 text-slate-700 text-base font-medium hover:bg-slate-50 transition"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="px-6 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-sm font-bold shadow-sm transition flex items-center gap-2"
+                className="px-7 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-base font-bold shadow-sm transition flex items-center gap-2"
               >
                 {isSubmitting ? 'Saving Listing...' : isEditing ? 'Save Changes' : 'Publish Listing'}
               </button>

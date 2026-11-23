@@ -24,6 +24,7 @@ from app.repositories.memory.repositories import (
 )
 from app.repositories.memory.store import InMemoryStore
 from app.services.ai.extraction import ExtractionService
+from app.services.ai.transcription import TranscriptionService
 from app.services.demand import RequirementService
 from app.services.exchange import ExchangeService
 from app.services.impact import ImpactService
@@ -48,6 +49,7 @@ class Container:
         self.exchanges = ExchangeService(self.repos, self.matching)
         self.impact = ImpactService(self.repos)
         self.extraction = ExtractionService(self.settings, self.http)
+        self.transcription = TranscriptionService(self.settings, self.http)
 
     async def aclose(self) -> None:
         await self.http.aclose()

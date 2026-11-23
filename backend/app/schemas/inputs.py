@@ -3,7 +3,7 @@ bounded sizes. Mirrors the Zod schemas the Next.js API used, with tighter upper 
 
 from __future__ import annotations
 
-from typing import Annotated, Self
+from typing import Annotated, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator, model_validator
 
@@ -24,6 +24,7 @@ Pieces = Annotated[int, Field(gt=0, le=1_000_000)]
 Bdt = Annotated[float, Field(ge=0, le=1_000_000_000)]
 City = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=80)]
 Text = Annotated[str, StringConstraints(max_length=2000)]
+AUDIO_MIME_TYPES = ("audio/webm", "audio/ogg", "audio/mp4", "audio/mpeg", "audio/wav", "audio/m4a")
 
 
 class StrictInput(BaseModel):
@@ -215,10 +216,5 @@ class ExchangeAction(StrictInput):
 
 
 class ExtractMaterialRequest(StrictInput):
-    prompt: Annotated[str, StringConstraints(min_length=5, max_length=2000)]
-    mock: bool | None = None
-
-
-class ExtractRequirementRequest(StrictInput):
     prompt: Annotated[str, StringConstraints(min_length=5, max_length=2000)]
     mock: bool | None = None

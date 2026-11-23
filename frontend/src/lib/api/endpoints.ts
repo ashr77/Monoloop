@@ -7,7 +7,7 @@ import type { MaterialListing, MaterialRequirement, Organization } from '@/lib/t
 import type { MatchResult } from '@/features/matching/types';
 import type { ExchangeAction, ExchangeView } from '@/features/exchanges/types';
 import type { ImpactReport } from '@/features/analytics/impact';
-import type { MaterialExtractionResult, RequirementExtractionResult } from '@/lib/ai/schemas';
+import type { MaterialExtractionResult } from '@/lib/ai/schemas';
 import { apiRequest } from './client';
 
 export interface ListingFilters {
@@ -37,6 +37,17 @@ export interface ExchangeFilters {
 export interface MatchOverviewRow {
   requirement: MaterialRequirement;
   result: MatchResult;
+}
+
+export interface TranscribeAudioInput {
+  audio_base64: string;
+  mime_type: string;
+  language: SpeechLanguage;
+}
+
+export interface TranscriptionResult {
+  transcript: string;
+  language: SpeechLanguage;
 }
 
 export type ListingInput = Record<string, unknown>;
@@ -126,12 +137,6 @@ export const api = {
   ai: {
     extractMaterial: (prompt: string, mock?: boolean) =>
       apiRequest<MaterialExtractionResult>('/api/ai/extract-material', {
-        method: 'POST',
-        body: mock === undefined ? { prompt } : { prompt, mock },
-        timeoutMs: 30_000,
-      }).then((r) => r.data),
-    extractRequirement: (prompt: string, mock?: boolean) =>
-      apiRequest<RequirementExtractionResult>('/api/ai/extract-requirement', {
         method: 'POST',
         body: mock === undefined ? { prompt } : { prompt, mock },
         timeoutMs: 30_000,

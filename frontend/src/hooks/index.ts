@@ -6,5 +6,4 @@ export { useMatch, useMatchesOverview } from './useMatches';
 export { useExchanges, useRequestExchange, useRequestListingOrder, useExchangeAction } from './useExchanges';
 export { useImpact } from './useImpact';
 export { useExtractMaterial } from './useExtractMaterial';
-export { useExtractRequirement } from './useExtractRequirement';
 export { queryKeys } from './queryKeys';
