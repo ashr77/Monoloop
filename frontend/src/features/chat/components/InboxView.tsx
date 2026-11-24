@@ -10,7 +10,7 @@ const time = (iso: string) =>
 const shortName = (name?: string | null) => (name ?? '').replace(' (Buyer Demo)', '');
 
 export function InboxView() {
-  const { organization, organizations, setOrganization } = useChatIdentity();
+  const { organization, organizations, setOrganization, locked } = useChatIdentity();
   const inbox = useInbox(organization?.id ?? null);
   const items = inbox.data?.items ?? [];
   const isSupplier = organization?.organization_type === 'SUPPLIER';
@@ -54,7 +54,9 @@ export function InboxView() {
             <Inbox className="w-10 h-10 text-slate-300 mx-auto mb-3" />
             <p className="text-base font-semibold text-slate-700">No conversations yet</p>
             <p className="text-sm text-slate-500 mt-1">
-              {isSupplier
+              {locked
+                ? 'Press Chat on any listing in the Supply marketplace. Buyers who chat about your listings appear here too.'
+                : isSupplier
                 ? 'When a buyer starts a chat about one of your listings, it appears here.'
                 : 'On the Supply page, choose “Order as buyer…” and press Chat on a listing.'}
             </p>

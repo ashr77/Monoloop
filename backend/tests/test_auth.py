@@ -182,3 +182,22 @@ async def test_demo_accounts_for_existing_companies(jwt_client):
     assert s["profile"]["organization"]["status"] == "APPROVED"
     r = await jwt_client.post("/api/listings", json={**listing_for(SUP_GAZIPUR), "city": "Gazipur"}, headers=bearer(s))
     assert r.status_code == 201, r.text
+
+
+async def test_every_company_with_a_login_can_buy_and_sell(jwt_client):
+    """Gazipur was seeded as SUPPLIER and Apex as BUYER; with logins both do both."""
+    from tests.conftest import BUYER_APEX
+    auth = jwt_client._transport.app.state.container.auth  # type: ignore[attr-defined]
+    await auth.ensure_demo_accounts("demo-pass-1")
+    login = lambda e: jwt_client.post("/api/auth/login", json={"email": e, "password": "demo-pass-1"})  # noqa: E731
+    gazipur = (await login("gazipur@monoloop.demo")).json()["data"]
+    apex = (await login("apex@monoloop.demo")).json()["data"]
+    assert gazipur["profile"]["organization"]["organization_type"] == "HYBRID"
+
+    # Former buyer lists surplus...
+    r = await jwt_client.post("/api/listings", json={**listing_for(BUYER_APEX), "city": "Dhaka"}, headers=bearer(apex))
+    assert r.status_code == 201, r.text
+    listing_id = r.json()["data"]["id"]
+    # ...and the former supplier chats with it as a buyer.
+    r = await jwt_client.post("/api/conversations", json={"listing_id": listing_id}, headers=bearer(gazipur))
+    assert r.status_code == 201, r.text

@@ -136,7 +136,8 @@ class AuthService:
         return updated
 
     async def ensure_demo_accounts(self, password: str, domain: str = "monoloop.demo") -> list[tuple[str, str]]:
-        """Give every existing company without a login one: <first word of name>@<domain>, APPROVED.
+        """Give every existing company without a login one: <first word of name>@<domain>, APPROVED and
+        HYBRID (with a login a company both supplies and buys).
         Idempotent: companies that already have a login are skipped. Returns (company, email)."""
         created: list[tuple[str, str]] = []
         used: set[str] = set()
@@ -157,6 +158,8 @@ class AuthService:
                     continue  # created earlier but not linked: leave it for a manual fix
                 raise
             await self.repos.organizations.update(org.id, {
+                # One account = one company that can both supply and buy.
+                "organization_type": "HYBRID",
                 "contact_email": email, "auth_user_id": user_id, "status": "APPROVED",
                 "license_number": org.license_number or f"DEMO-{org.id[:8].upper()}",
             })
