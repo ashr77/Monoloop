@@ -8,7 +8,7 @@ from fastapi import APIRouter, Body, Path, Query, Request, status
 
 from app.api.deps import ContainerDep
 from app.core.errors import AppError
-from app.core.security import require_actor, resolve_actor
+from app.core.security import require_actor, require_admin, resolve_actor
 from app.domain.constants import ExchangeStatus
 from app.schemas.common import ApiResponse, ok
 from app.schemas.exchange import ExchangeView
@@ -72,6 +72,9 @@ async def act_on_exchange(
 
 
 @router.get("/impact", response_model=ApiResponse[ImpactReport], tags=["impact"])
-async def impact(c: ContainerDep, organization_id: Annotated[str | None, Query(max_length=64)] = None):
-    """Only COMPLETED exchanges count as reuse."""
+async def impact(request: Request, c: ContainerDep,
+                 organization_id: Annotated[str | None, Query(max_length=64)] = None):
+    """Only COMPLETED exchanges count as reuse. With AUTH_MODE=jwt: admins only (platform-wide data)."""
+    if c.settings.auth_mode == "jwt":
+        await require_admin(request)
     return ok(await c.impact.report(organization_id or None))

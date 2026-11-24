@@ -149,7 +149,7 @@ export function homeFor(profile: Profile | null): string {
 function allowed(path: string, profile: Profile | null): boolean {
   if (PUBLIC_PATHS.some((p) => path.startsWith(p))) return true;
   if (!profile) return false;
-  if (path.startsWith('/admin')) return profile.role === 'admin';
+  if (path.startsWith('/admin') || path.startsWith('/impact')) return profile.role === 'admin'; // platform-wide data
   if (profile.role === 'admin') return true; // admins may browse (read-only: the API blocks trading)
   const approved = profile.organization?.status === 'APPROVED';
   return path.startsWith('/pending') ? !approved : approved;
