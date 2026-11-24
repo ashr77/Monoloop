@@ -11,6 +11,7 @@ import asyncio
 import json
 from pathlib import Path
 
+from app.schemas.chat import ChatMessage, ConversationRecord
 from app.schemas.entities import (
     ActivityLog,
     ExchangeItemRecord,
@@ -44,6 +45,10 @@ class InMemoryStore:
         self.items: dict[str, ExchangeItemRecord] = {}
         self.logs: list[ActivityLog] = []
         self.payments: dict = {}  # tran_id -> PaymentRecord (repositories/memory/payments.py)
+        # Buyer ↔ supplier chat (migration 00008)
+        self.conversations: dict[str, ConversationRecord] = {}
+        self.chat_messages: list[ChatMessage] = []
+        self.chat_seq = 0
 
     # Read helpers return copies so callers can never mutate the store through a result.
     def listing_view(self, listing: Listing) -> Listing:

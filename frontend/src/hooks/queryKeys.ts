@@ -21,4 +21,10 @@ export const queryKeys = {
     list: (f: ExchangeFilters) => ['exchanges', 'list', f] as const,
   },
   impact: (organizationId: string | null) => ['impact', organizationId] as const,
+  chat: {
+    all: ['chat'] as const,
+    inbox: (organizationId: string) => ['chat', 'inbox', organizationId] as const,
+    thread: (conversationId: string, organizationId: string) =>
+      ['chat', 'thread', conversationId, organizationId] as const,
+  },
 };

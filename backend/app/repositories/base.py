@@ -12,6 +12,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Literal, Protocol
 
+from app.schemas.chat import ChatMessage, ConversationRecord
 from app.schemas.entities import Listing, Organization, Requirement
 from app.schemas.exchange import ExchangeView
 from app.schemas.payment import PaymentRecord
@@ -81,6 +82,17 @@ class ExchangeRepository(Protocol):
     async def act(self, action: ExchangeActionName, exchange_id: str, actor_id: str, item_id: str | None) -> None: ...
 
 
+class ChatRepository(Protocol):
+    """Buyer ↔ supplier chat. Writes are atomic with the same rules everywhere
+    (PL/pgSQL in migration 00008, mirrored in memory/chat.py)."""
+
+    async def open_conversation(self, listing_id: str, buyer_id: str) -> str: ...
+    async def get_conversation(self, conversation_id: str) -> ConversationRecord | None: ...
+    async def list_conversations(self, organization_id: str) -> list[ConversationRecord]: ...
+    async def messages(self, conversation_id: str, after_seq: int, limit: int) -> list[ChatMessage]: ...
+    async def post_message(self, conversation_id: str, actor_id: str, body: str) -> str: ...
+    async def mark_read(self, conversation_id: str, actor_id: str) -> None: ...
+
 class PaymentRepository(Protocol):
     async def create(self, data: dict) -> PaymentRecord: ...
     async def get_by_tran_id(self, tran_id: str) -> PaymentRecord | None: ...
@@ -99,5 +111,6 @@ class Repositories:
     listings: ListingRepository
     requirements: RequirementRepository
     exchanges: ExchangeRepository
+    chat: ChatRepository
     backend: Literal["memory", "postgres", "supabase"]
     payments: PaymentRepository | None = None

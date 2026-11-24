@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Layers, Package, FileText, Cpu, ArrowLeftRight, Activity, Sparkles } from 'lucide-react';
+import { Layers, Package, FileText, Cpu, ArrowLeftRight, Activity, Sparkles, MessageCircle } from 'lucide-react';
+import { UnreadBadge } from '@/features/chat/components/UnreadBadge';
 import { useState } from 'react';
 import { Menu, X } from 'lucide-react';
 
@@ -17,6 +18,7 @@ export function Navbar() {
     { href: '/matches/d1111111-1111-4111-d111-111111111111', label: 'Matches', icon: Cpu },
     { href: '/exchanges', label: 'Exchanges', icon: ArrowLeftRight, badge: 'Member 4' },
     { href: '/impact', label: 'Impact', icon: Activity, badge: 'Member 4' },
+    { href: '/messages', label: 'Messages', icon: MessageCircle },
   ];
 
   return (
@@ -52,6 +54,7 @@ export function Navbar() {
               >
                 <Icon className={`w-4 h-4 ${isActive ? 'text-emerald-600' : 'text-slate-400'}`} />
                 <span>{link.label}</span>
+                {link.href === '/messages' && <UnreadBadge />}
               </Link>
             );
           })}
@@ -95,6 +98,7 @@ export function Navbar() {
                 >
                   <Icon className={`h-4 w-4 ${isActive ? 'text-emerald-600' : 'text-slate-400'}`} />
                   {link.label}
+                  {link.href === '/messages' && <UnreadBadge />}
                 </Link>
               );
             })}
