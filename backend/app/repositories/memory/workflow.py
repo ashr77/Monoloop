@@ -110,6 +110,76 @@ def create_exchange_request(s: InMemoryStore, requirement_id: str, buyer_id: str
     return ex.id
 
 
+def create_listing_order(s: InMemoryStore, listing_id: str, quantity: int, buyer_id: str) -> str:
+    listing = _listing(s, listing_id)
+    if listing.status != "ACTIVE":
+        raise AppError("LISTING_UNAVAILABLE", f"Listing is {listing.status} and cannot be ordered.")
+    if listing.organization_id == buyer_id:
+        raise AppError("VALIDATION_ERROR", "A buyer cannot order its own listing.")
+    available = listing.total_quantity - listing.reserved_quantity
+    if quantity <= 0:
+        raise AppError("VALIDATION_ERROR", "Requested quantity must be a positive whole number.")
+    if quantity > available:
+        raise AppError(
+            "INSUFFICIENT_STOCK",
+            f"Only {available} piece(s) are still available.",
+            {"available": available, "requested": quantity},
+        )
+    pending_quantity = sum(
+        i.quantity
+        for i in s.items.values()
+        if i.listing_id == listing_id
+        and i.status in ("PENDING", "ACCEPTED")
+        and i.exchange_id in s.exchanges
+        and s.exchanges[i.exchange_id].status in ("PROPOSED", "IN_PROGRESS")
+    )
+    if pending_quantity + quantity > available:
+        raise AppError(
+            "INSUFFICIENT_STOCK",
+            f"Only {available - pending_quantity} piece(s) remain uncommitted.",
+            {"available": available - pending_quantity, "requested": quantity},
+        )
+    if any(
+        i.status == "PENDING"
+        and i.listing_id == listing_id
+        and s.exchanges[i.exchange_id].buyer_organization_id == buyer_id
+        and s.exchanges[i.exchange_id].status == "PROPOSED"
+        for i in s.items.values()
+        if i.exchange_id in s.exchanges
+    ):
+        raise AppError("DUPLICATE_EXCHANGE", "An active order already exists for this listing.")
+
+    now = now_iso()
+    ex = ExchangeRecord(
+        id=str(uuid.uuid4()),
+        requirement_id=None,
+        buyer_organization_id=buyer_id,
+        status="PROPOSED",
+        created_at=now,
+        updated_at=now,
+    )
+    s.exchanges[ex.id] = ex
+    item = ExchangeItemRecord(
+        id=str(uuid.uuid4()),
+        exchange_id=ex.id,
+        listing_id=listing.id,
+        supplier_organization_id=listing.organization_id,
+        quantity=quantity,
+        unit_price_bdt=float(listing.unit_price_bdt),
+        status="PENDING",
+        created_at=now,
+        updated_at=now,
+    )
+    s.items[item.id] = item
+    _log(s, ex.id, "DIRECT_LISTING_ORDER", {
+        "actor_organization_id": buyer_id,
+        "listing_id": listing_id,
+        "quantity": quantity,
+        "unit_price_bdt": listing.unit_price_bdt,
+    })
+    return ex.id
+
+
 def accept_item(s: InMemoryStore, exchange_id: str, item_id: str, actor_id: str) -> None:
     ex, item = _exchange(s, exchange_id), _item(s, exchange_id, item_id)
     if item.supplier_organization_id != actor_id:

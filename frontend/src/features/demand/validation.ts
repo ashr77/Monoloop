@@ -27,13 +27,25 @@ export const createRequirementSchema = z
     }),
     length_mm: z
       .number({ invalid_type_error: 'Length must be a number' })
-      .positive('Length must be greater than 0 mm'),
+      .positive('Length must be greater than 0 mm')
+      .nullable()
+      .optional(),
     width_mm: z
       .number({ invalid_type_error: 'Width must be a number' })
-      .positive('Width must be greater than 0 mm'),
+      .positive('Width must be greater than 0 mm')
+      .nullable()
+      .optional(),
     thickness_mm: z
       .number({ invalid_type_error: 'Thickness must be a number' })
-      .positive('Thickness must be greater than 0 mm'),
+      .positive('Thickness must be greater than 0 mm')
+      .nullable()
+      .optional(),
+    length_min_mm: z.number().positive().nullable().optional(),
+    length_max_mm: z.number().positive().nullable().optional(),
+    width_min_mm: z.number().positive().nullable().optional(),
+    width_max_mm: z.number().positive().nullable().optional(),
+    thickness_min_mm: z.number().positive().nullable().optional(),
+    thickness_max_mm: z.number().positive().nullable().optional(),
     required_quantity: z
       .number({ invalid_type_error: 'Required quantity must be an integer' })
       .int('Quantity must be a whole number of pieces')

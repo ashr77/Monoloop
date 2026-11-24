@@ -3,7 +3,7 @@ bounded sizes. Mirrors the Zod schemas the Next.js API used, with tighter upper 
 
 from __future__ import annotations
 
-from typing import Annotated, Self
+from typing import Annotated, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator, model_validator
 
@@ -24,6 +24,7 @@ Pieces = Annotated[int, Field(gt=0, le=1_000_000)]
 Bdt = Annotated[float, Field(ge=0, le=1_000_000_000)]
 City = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=80)]
 Text = Annotated[str, StringConstraints(max_length=2000)]
+AUDIO_MIME_TYPES = ("audio/webm", "audio/ogg", "audio/mp4", "audio/mpeg", "audio/wav", "audio/m4a")
 
 
 class StrictInput(BaseModel):
@@ -116,9 +117,15 @@ class RequirementCreate(StrictInput):
     organization_id: UuidStr
     material_family: MaterialFamily
     material_specification: MaterialSpecification
-    length_mm: Mm
-    width_mm: Mm
-    thickness_mm: Mm
+    length_mm: Mm | None = None
+    width_mm: Mm | None = None
+    thickness_mm: Mm | None = None
+    length_min_mm: Mm | None = None
+    length_max_mm: Mm | None = None
+    width_min_mm: Mm | None = None
+    width_max_mm: Mm | None = None
+    thickness_min_mm: Mm | None = None
+    thickness_max_mm: Mm | None = None
     required_quantity: Pieces
     quantity_unit: QuantityUnit = "PIECE"
     maximum_budget_bdt: Bdt | None = None
@@ -131,6 +138,20 @@ class RequirementCreate(StrictInput):
         _check_spec(self.material_family, self.material_specification)
         return self
 
+    @model_validator(mode="after")
+    def _dimension_ranges(self) -> Self:
+        for name in ("length", "width", "thickness"):
+            minimum = getattr(self, f"{name}_min_mm")
+            maximum = getattr(self, f"{name}_max_mm")
+            exact = getattr(self, f"{name}_mm")
+            if minimum is not None and maximum is not None and minimum > maximum:
+                raise ValueError(f"{name.capitalize()} minimum cannot exceed maximum")
+            if maximum is not None and minimum is None:
+                raise ValueError(f"{name.capitalize()} minimum is required when a range maximum is provided")
+            if exact is not None and (minimum is not None or maximum is not None):
+                raise ValueError(f"{name.capitalize()} exact value cannot be combined with range values")
+        return self
+
 
 class RequirementUpdate(StrictInput):
     material_family: MaterialFamily | None = None
@@ -138,6 +159,12 @@ class RequirementUpdate(StrictInput):
     length_mm: Mm | None = None
     width_mm: Mm | None = None
     thickness_mm: Mm | None = None
+    length_min_mm: Mm | None = None
+    length_max_mm: Mm | None = None
+    width_min_mm: Mm | None = None
+    width_max_mm: Mm | None = None
+    thickness_min_mm: Mm | None = None
+    thickness_max_mm: Mm | None = None
     required_quantity: Pieces | None = None
     maximum_budget_bdt: Bdt | None = None
     allow_split_suppliers: bool | None = None
@@ -152,6 +179,20 @@ class RequirementUpdate(StrictInput):
         _check_spec(self.material_family, self.material_specification)
         return self
 
+    @model_validator(mode="after")
+    def _dimension_ranges(self) -> Self:
+        for name in ("length", "width", "thickness"):
+            minimum = getattr(self, f"{name}_min_mm")
+            maximum = getattr(self, f"{name}_max_mm")
+            exact = getattr(self, f"{name}_mm")
+            if minimum is not None and maximum is not None and minimum > maximum:
+                raise ValueError(f"{name.capitalize()} minimum cannot exceed maximum")
+            if maximum is not None and minimum is None:
+                raise ValueError(f"{name.capitalize()} minimum is required when a range maximum is provided")
+            if exact is not None and (minimum is not None or maximum is not None):
+                raise ValueError(f"{name.capitalize()} exact value cannot be combined with range values")
+        return self
+
     def changes(self) -> dict:
         return self.model_dump(exclude_unset=True, exclude=_NOT_WRITABLE)
 
@@ -160,8 +201,10 @@ class RequirementUpdate(StrictInput):
 
 
 class ExchangeCreate(StrictInput):
-    requirement_id: UuidStr
+    requirement_id: UuidStr | None = None
     buyer_organization_id: UuidStr
+    listing_id: UuidStr | None = None
+    quantity: Pieces | None = None
 
 
 class ExchangeAction(StrictInput):

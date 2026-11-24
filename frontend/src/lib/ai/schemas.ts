@@ -21,6 +21,8 @@ export const materialExtractionSchema = z.object({
   raw_notes: z.string().optional().nullable(),
   missing_fields: z.array(z.string()).default([]),
   confidence_scores: z.record(z.string(), z.enum(['HIGH', 'MEDIUM', 'LOW', 'NONE'])).default({}),
+  /** 'ai' = hosted model; 'heuristic' = offline parser (mock mode or the AI service failed). */
+  source: z.enum(['ai', 'heuristic']).default('ai'),
 });
 
 export type MaterialExtractionResult = z.infer<typeof materialExtractionSchema>;

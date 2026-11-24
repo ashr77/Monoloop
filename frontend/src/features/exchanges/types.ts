@@ -39,7 +39,7 @@ export interface ExchangeItemView extends ExchangeItemRecord {
   supplier?: Organization;
 }
 
-/** Online payment for an exchange (SSLCommerz sandbox; backend migration 00005). */
+/** Online payment for an exchange (SSLCommerz sandbox; backend migration 00007). */
 export type PaymentStatus = 'INITIATED' | 'PAID' | 'FAILED' | 'CANCELLED';
 
 export interface PaymentSummary {

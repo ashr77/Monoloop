@@ -7,7 +7,8 @@ from typing import Annotated
 from fastapi import APIRouter, Path, Query, Request, status
 
 from app.api.deps import ContainerDep
-from app.core.security import require_actor
+from app.core.security import require_actor, resolve_actor
+from app.core.errors import AppError
 from app.domain.constants import MaterialFamily, RequirementStatus
 from app.repositories.base import RequirementFilter
 from app.schemas.common import ApiResponse, ok
@@ -21,10 +22,14 @@ IdPath = Annotated[str, Path(max_length=64)]
 @router.get("/requirements", response_model=ApiResponse[list[Requirement]])
 async def list_requirements(
     c: ContainerDep,
+    request: Request,
     organization_id: Annotated[str | None, Query(max_length=64)] = None,
     material_family: MaterialFamily | None = None,
     status_: Annotated[RequirementStatus | None, Query(alias="status")] = None,
 ):
+    actor = await resolve_actor(request, c.settings)
+    if actor:
+        organization_id = actor
     reqs, stats = await c.requirements.list(RequirementFilter(organization_id or None, material_family, status_))
     return ok(
         reqs,
@@ -41,8 +46,12 @@ async def create_requirement(body: RequirementCreate, request: Request, c: Conta
 
 
 @router.get("/requirements/{requirement_id}", response_model=ApiResponse[Requirement])
-async def get_requirement(requirement_id: IdPath, c: ContainerDep):
-    return ok(await c.requirements.get(requirement_id))
+async def get_requirement(requirement_id: IdPath, request: Request, c: ContainerDep):
+    actor = await resolve_actor(request, c.settings)
+    requirement = await c.requirements.get(requirement_id)
+    if actor and requirement.organization_id != actor:
+        raise AppError("FORBIDDEN_ORGANIZATION", "You cannot view another buyer's requirement.")
+    return ok(requirement)
 
 
 @router.patch("/requirements/{requirement_id}", response_model=ApiResponse[Requirement])

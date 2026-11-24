@@ -111,7 +111,7 @@ Reserved ──"Pay ৳…"──▶ SSLCommerz checkout ──▶ /api/payments
 
 | Item | Location |
 | :-- | :-- |
-| Migration | `supabase/migrations/00005_payments.sql` (table `payments`, one PAID per exchange) |
+| Migration | `supabase/migrations/00007_payments.sql` (table `payments`, one PAID per exchange) |
 | Gateway (Strategy) | `backend/app/services/payments/gateway.py` (`SSLCommerzGateway`) |
 | Rules | `backend/app/services/payments/service.py` |
 | API | `POST /api/payments/exchanges/{id}`, `POST /api/payments/sslcommerz/{success,fail,cancel,ipn}` |
@@ -123,7 +123,7 @@ Reserved ──"Pay ৳…"──▶ SSLCommerz checkout ──▶ /api/payments
 - **Off by default.** With `PAYMENT_PROVIDER=none`, exchanges complete without payment, exactly as before.
 
 **Setup:**
-1. Run `00005_payments.sql`.
+1. Run `00007_payments.sql`.
 2. In `backend/.env` set `PAYMENT_PROVIDER=sslcommerz`, `SSLCOMMERZ_STORE_ID` and `SSLCOMMERZ_STORE_PASSWORD`, and keep `SSLCOMMERZ_SANDBOX=true`.
 3. Sandbox test card: VISA `4111 1111 1111 1111`, CVV `111`, any future expiry, OTP `111111`.
 

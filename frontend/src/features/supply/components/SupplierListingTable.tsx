@@ -9,24 +9,42 @@ import {
   Clock,
   MapPin,
   AlertCircle,
+  ShoppingCart,
+  X,
 } from 'lucide-react';
 import { MaterialListing } from '@/lib/types';
 import { MaterialFamily } from '@/lib/constants';
 import { useSaveListing } from '@/hooks';
 import { errorMessage } from '@/lib/api/client';
+import { useRequestListingOrder } from '@/hooks';
 
 interface Props {
   listings: MaterialListing[];
   onEdit: (listing: MaterialListing) => void;
   onRefresh: () => void;
+  organizations?: import('@/lib/types').Organization[];
+  buyerOrganizationId?: string;
+  onBuyerOrganizationChange?: (organizationId: string) => void;
 }
 
-export function SupplierListingTable({ listings, onEdit, onRefresh }: Props) {
+export function SupplierListingTable({
+  listings,
+  onEdit,
+  onRefresh,
+  organizations = [],
+  buyerOrganizationId,
+  onBuyerOrganizationChange,
+}: Props) {
   const saveListing = useSaveListing();
   const [searchTerm, setSearchTerm] = useState('');
   const [familyFilter, setFamilyFilter] = useState<'ALL' | MaterialFamily>('ALL');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'ARCHIVED'>('ACTIVE');
   const [isArchivingId, setIsArchivingId] = useState<string | null>(null);
+  const [orderListing, setOrderListing] = useState<MaterialListing | null>(null);
+  const [orderQuantity, setOrderQuantity] = useState('');
+  const [orderError, setOrderError] = useState('');
+  const [orderSuccess, setOrderSuccess] = useState('');
+  const requestListingOrder = useRequestListingOrder();
 
   // Filter listings
   const filtered = listings.filter((item) => {
@@ -71,8 +89,100 @@ export function SupplierListingTable({ listings, onEdit, onRefresh }: Props) {
     }
   };
 
+  const openOrder = (listing: MaterialListing) => {
+    setOrderListing(listing);
+    setOrderQuantity('');
+    setOrderError('');
+    setOrderSuccess('');
+  };
+
+  const placeOrder = async () => {
+    if (!orderListing) return;
+    if (!buyerOrganizationId) {
+      setOrderError('Select a buyer organization first.');
+      return;
+    }
+    const quantity = Number(orderQuantity);
+    if (!Number.isInteger(quantity) || quantity <= 0) {
+      setOrderError('Quantity must be a positive whole number.');
+      return;
+    }
+    if (quantity > orderListing.available_quantity) {
+      setOrderError(`Only ${orderListing.available_quantity} pieces are available.`);
+      return;
+    }
+    if (orderListing.organization_id === buyerOrganizationId) {
+      setOrderError('You cannot order your own supply listing.');
+      return;
+    }
+    if (orderListing.status !== 'ACTIVE' || orderListing.available_quantity <= 0) {
+      setOrderError('This listing is no longer active and available.');
+      return;
+    }
+    setOrderError('');
+    try {
+      await requestListingOrder.mutateAsync({
+        listingId: orderListing.id,
+        quantity,
+        buyerOrganizationId,
+      });
+      setOrderSuccess('Order request submitted. The supplier can now accept or reject it.');
+      onRefresh();
+    } catch (error) {
+      setOrderError(errorMessage(error, 'Could not place the order.'));
+    }
+  };
+
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <>
+      {orderListing && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/40 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+              <h2 className="text-lg font-bold text-slate-900">Place Supply Order</h2>
+              <button type="button" onClick={() => setOrderListing(null)} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100" aria-label="Close">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="space-y-4 p-5">
+              <dl className="grid grid-cols-2 gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm">
+                <div><dt className="text-xs text-slate-500">Material</dt><dd className="font-bold text-slate-900">{orderListing.material_specification}</dd></div>
+                <div><dt className="text-xs text-slate-500">Supplier</dt><dd className="font-bold text-slate-900">{orderListing.organization?.name || 'Supplier'}</dd></div>
+                <div><dt className="text-xs text-slate-500">Available</dt><dd className="font-bold text-slate-900">{orderListing.available_quantity} pcs</dd></div>
+                <div><dt className="text-xs text-slate-500">Unit price</dt><dd className="font-bold text-slate-900">BDT {orderListing.unit_price_bdt.toLocaleString()}</dd></div>
+                <div className="col-span-2"><dt className="text-xs text-slate-500">Specifications</dt><dd className="font-medium text-slate-700">{orderListing.length_mm} × {orderListing.width_mm} × {orderListing.thickness_mm} mm · {orderListing.condition}</dd></div>
+              </dl>
+              <label className="block text-sm font-medium text-slate-700">
+                Quantity to order
+                <input
+                  type="number"
+                  min="1"
+                  max={orderListing.available_quantity}
+                  step="1"
+                  value={orderQuantity}
+                  onChange={(event) => setOrderQuantity(event.target.value)}
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                />
+              </label>
+              <div className="flex items-center justify-between rounded-lg bg-emerald-50 px-4 py-3 text-sm">
+                <span className="font-medium text-slate-700">Estimated total</span>
+                <span className="font-extrabold text-emerald-800">
+                  BDT {Number(orderQuantity) > 0 ? (Number(orderQuantity) * orderListing.unit_price_bdt).toLocaleString() : '0'}
+                </span>
+              </div>
+              {orderError && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{orderError}</p>}
+              {orderSuccess && <p role="status" className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{orderSuccess}</p>}
+              <div className="flex justify-end gap-3">
+                <button type="button" onClick={() => setOrderListing(null)} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600">Cancel</button>
+                <button type="button" onClick={placeOrder} disabled={requestListingOrder.isPending || Boolean(orderSuccess)} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-60">
+                  {requestListingOrder.isPending ? 'Placing...' : 'Place Order'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
       {/* Table Toolbar */}
       <div className="p-4 sm:p-5 border-b border-slate-200 flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between bg-slate-50/50">
         {/* Search Input */}
@@ -89,6 +199,21 @@ export function SupplierListingTable({ listings, onEdit, onRefresh }: Props) {
 
         {/* Filters */}
         <div className="flex flex-wrap items-center gap-2">
+          {organizations.length > 0 && (
+            <select
+              value={buyerOrganizationId || ''}
+              onChange={(event) => onBuyerOrganizationChange?.(event.target.value)}
+              className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700"
+              aria-label="Buyer identity"
+            >
+              <option value="">Order as buyer...</option>
+              {organizations
+                .filter((organization) => organization.organization_type === 'BUYER' || organization.organization_type === 'HYBRID')
+                .map((organization) => (
+                  <option key={organization.id} value={organization.id}>{organization.name}</option>
+                ))}
+            </select>
+          )}
           {/* Family Filter */}
           <div className="flex items-center gap-1.5 bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs text-slate-700">
             <Filter className="w-3.5 h-3.5 text-slate-400" />
@@ -244,6 +369,17 @@ export function SupplierListingTable({ listings, onEdit, onRefresh }: Props) {
                     {/* Actions */}
                     <td className="py-3.5 px-4 text-right">
                       <div className="flex items-center justify-end gap-1.5">
+                        {item.status === 'ACTIVE' && item.available_quantity > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => openOrder(item)}
+                            className="inline-flex items-center gap-1 rounded-md bg-emerald-600 px-2.5 py-1.5 text-[11px] font-bold text-white hover:bg-emerald-700"
+                            title="Order this supply listing"
+                          >
+                            <ShoppingCart className="w-3.5 h-3.5" />
+                            Order
+                          </button>
+                        )}
                         <button
                           onClick={() => onEdit(item)}
                           disabled={isArchived}
@@ -271,6 +407,7 @@ export function SupplierListingTable({ listings, onEdit, onRefresh }: Props) {
           </tbody>
         </table>
       </div>
-    </div>
+      </div>
+    </>
   );
 }

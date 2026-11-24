@@ -103,9 +103,15 @@ class Requirement(Entity):
     organization_id: str
     material_family: MaterialFamily
     material_specification: str
-    length_mm: Num
-    width_mm: Num
-    thickness_mm: Num
+    length_mm: Num | None = None
+    width_mm: Num | None = None
+    thickness_mm: Num | None = None
+    length_min_mm: Num | None = None
+    length_max_mm: Num | None = None
+    width_min_mm: Num | None = None
+    width_max_mm: Num | None = None
+    thickness_min_mm: Num | None = None
+    thickness_max_mm: Num | None = None
     required_quantity: Int
     quantity_unit: QuantityUnit = "PIECE"
     maximum_budget_bdt: Num | None = None

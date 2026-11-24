@@ -4,12 +4,14 @@ import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Building2, Plus, RefreshCw, Search, Edit3, Cpu, FileText, AlertCircle } from 'lucide-react';
 import { MaterialRequirement, Organization } from '@/lib/types';
+import type { MatchResult } from '@/features/matching/types';
 import { DEMO_ORGANIZATIONS } from '@/lib/constants';
 import { DEMO_BUYER_ORGANIZATIONS } from '@/features/demand/data/demoBuyers';
 import { BuyerStatsCards } from './BuyerStatsCards';
 import { RequirementFormModal } from './RequirementFormModal';
-import { useOrganizations, useRequirements } from '@/hooks';
+import { useOrganizations, useRequirements, useMatch } from '@/hooks';
 import { errorMessage } from '@/lib/api/client';
+import { RequestExchangeButton } from '@/features/exchanges/components/RequestExchangeButton';
 
 export function BuyerDemandDashboard() {
   const [selectedOrgId, setSelectedOrgId] = useState('ALL');
@@ -17,6 +19,12 @@ export function BuyerDemandDashboard() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<MaterialRequirement | null>(null);
   const [toast, setToast] = useState('');
+  const [recommendationRequirementId, setRecommendationRequirementId] = useState<string | null>(null);
+  const [recommendationOrganizationId, setRecommendationOrganizationId] = useState<string | null>(null);
+  const recommendationQuery = useMatch(
+    recommendationRequirementId || '',
+    recommendationOrganizationId || undefined
+  );
 
   // Data comes from the FastAPI backend through cached hooks (src/hooks).
   const orgsQuery = useOrganizations();
@@ -26,7 +34,10 @@ export function BuyerDemandDashboard() {
     return [...live, ...DEMO_BUYER_ORGANIZATIONS.filter((demo) => !live.some((o) => o.id === demo.id))];
   }, [orgsQuery.data]);
 
-  const requirementsQuery = useRequirements(selectedOrgId === 'ALL' ? {} : { organization_id: selectedOrgId });
+  const requirementsQuery = useRequirements(
+    selectedOrgId === 'ALL' ? {} : { organization_id: selectedOrgId },
+    selectedOrgId === 'ALL' ? undefined : selectedOrgId
+  );
   const requirements = requirementsQuery.data?.items ?? [];
   const pendingMatchRequirementIds = requirementsQuery.data?.meta.pending_match_requirement_ids ?? [];
   const fulfilledQuantities = requirementsQuery.data?.meta.fulfilled_quantities_by_requirement ?? {};
@@ -44,8 +55,12 @@ export function BuyerDemandDashboard() {
     setModalOpen(true);
   };
 
-  const onSaved = () => {
+  const onSaved = (saved: MaterialRequirement) => {
     setToast(editing ? 'Requirement updated.' : 'Requirement published.');
+    if (!editing) {
+      setRecommendationRequirementId(saved.id);
+      setRecommendationOrganizationId(saved.organization_id);
+    }
     fetchRequirements();
     window.setTimeout(() => setToast(''), 4000);
   };
@@ -201,8 +216,17 @@ export function BuyerDemandDashboard() {
                         <div className="mt-0.5 text-[11px] font-medium text-blue-700">{organizationName}</div>
                       </td>
                       <td className="px-4 py-4 font-mono text-xs">
-                        {requirement.length_mm} × {requirement.width_mm} mm
-                        <div className="mt-1 text-slate-400">Thickness: {requirement.thickness_mm} mm</div>
+                        {requirement.length_mm ?? (requirement.length_min_mm != null
+                          ? `${requirement.length_min_mm}${requirement.length_max_mm != null ? `-${requirement.length_max_mm}` : '+'}`
+                          : 'Not specified')}
+                        {requirement.width_mm != null || requirement.width_min_mm != null
+                          ? ` × ${requirement.width_mm ?? (requirement.width_min_mm != null ? `${requirement.width_min_mm}${requirement.width_max_mm != null ? `-${requirement.width_max_mm}` : '+'}` : 'Not specified')} mm`
+                          : ''}
+                        <div className="mt-1 text-slate-400">
+                          Thickness: {requirement.thickness_mm ?? (requirement.thickness_min_mm != null
+                            ? `${requirement.thickness_min_mm}${requirement.thickness_max_mm != null ? `-${requirement.thickness_max_mm}` : '+'}`
+                            : 'Not specified')} mm
+                        </div>
                       </td>
                       <td className="px-4 py-4">
                         <span className="font-bold text-slate-900">{requirement.required_quantity}</span> pcs
@@ -250,6 +274,123 @@ export function BuyerDemandDashboard() {
           </div>
         )}
       </div>
+
+      {recommendationRequirementId && (
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wider text-emerald-700">Newly created demand</p>
+              <h2 className="mt-1 text-lg font-bold text-slate-900">Recommended Supplies</h2>
+            </div>
+            {recommendationQuery.isFetching && <RefreshCw className="h-4 w-4 animate-spin text-slate-400" />}
+          </div>
+          {recommendationQuery.isPending && (
+            <p className="mt-4 text-sm text-slate-500">Finding compatible available supply...</p>
+          )}
+          {recommendationQuery.isError && (
+            <p className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+              Recommendations could not be loaded.
+            </p>
+          )}
+          {recommendationQuery.data && (() => {
+            const result: MatchResult = recommendationQuery.data.result;
+            const compatible = result.evaluations
+              .filter((evaluation) => evaluation.compatible)
+              .sort((a, b) => b.available_quantity - a.available_quantity || a.unit_price_bdt - b.unit_price_bdt);
+            const combinedAvailable = compatible.reduce((sum, evaluation) => sum + evaluation.available_quantity, 0);
+            const required = result.requested_quantity;
+            const fulfilment = combinedAvailable >= required
+              ? 'Full match available'
+              : combinedAvailable > 0
+                ? `Partial match: ${combinedAvailable}/${required} units available`
+                : 'No compatible supply found';
+
+            return (
+              <div className="mt-4 space-y-4">
+                <div className="flex flex-wrap gap-2">
+                  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700">{fulfilment}</span>
+                  {result.budget.status === 'OVER_BUDGET' && (
+                    <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800">Over budget</span>
+                  )}
+                  {result.budget.status === 'WITHIN_BUDGET' && (
+                    <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-800">Within budget</span>
+                  )}
+                </div>
+
+                {compatible.length === 0 ? (
+                  <p className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                    No active, available supply listing satisfies every technical requirement.
+                  </p>
+                ) : (
+                  <div className="grid gap-3 md:grid-cols-2">
+                    {compatible.map((evaluation) => {
+                      const allocation = result.allocations.find((item) => item.listing_id === evaluation.listing_id)
+                        ?? result.over_budget_alternative?.find((item) => item.listing_id === evaluation.listing_id);
+                      return (
+                        <article key={evaluation.listing_id} className="rounded-xl border border-slate-200 p-4">
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <h3 className="font-bold text-slate-900">{evaluation.supplier_name}</h3>
+                              <p className="mt-1 text-xs text-slate-500">{evaluation.material_specification} · {evaluation.dimensions}</p>
+                            </div>
+                            <span className="rounded-full bg-emerald-50 px-2 py-1 text-[11px] font-bold text-emerald-700">Technically compatible</span>
+                          </div>
+                          <dl className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                            <div><dt className="text-slate-500">Available</dt><dd className="font-bold text-slate-900">{evaluation.available_quantity} pcs</dd></div>
+                            <div><dt className="text-slate-500">Unit price</dt><dd className="font-bold text-slate-900">BDT {evaluation.unit_price_bdt.toLocaleString()}</dd></div>
+                            {allocation && (
+                              <>
+                                <div><dt className="text-slate-500">Allocated</dt><dd className="font-bold text-slate-900">{allocation.allocated_quantity} pcs</dd></div>
+                                <div><dt className="text-slate-500">Material cost</dt><dd className="font-bold text-slate-900">BDT {allocation.subtotal_bdt.toLocaleString()}</dd></div>
+                                <div><dt className="text-slate-500">Transport</dt><dd className="font-bold text-slate-900">BDT {allocation.estimated_transport_bdt.toLocaleString()}</dd></div>
+                                <div><dt className="text-slate-500">Distance</dt><dd className="font-bold text-slate-900">{allocation.distance_km} km</dd></div>
+                              </>
+                            )}
+                          </dl>
+                          <p className="mt-3 text-xs text-slate-600">
+                            {allocation
+                              ? allocation.allocated_quantity >= evaluation.available_quantity
+                                ? 'Available stock included in the proposed allocation'
+                                : 'Partial quantity included in the proposed allocation'
+                              : 'Technically compatible; not selected in the cheapest allocation'}
+                          </p>
+                        </article>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {combinedAvailable > 0 && combinedAvailable < required && (
+                  <p className="text-sm font-semibold text-amber-800">
+                    Combined availability: {combinedAvailable}/{required} units. {required - combinedAvailable} units remain unfulfilled.
+                  </p>
+                )}
+                {result.compatibility_explanations.length > 0 && (
+                  <ul className="list-disc space-y-1 pl-5 text-xs text-slate-600">
+                    {result.compatibility_explanations.map((line, index) => (
+                      <li key={`${line}-${index}`}>{line}</li>
+                    ))}
+                  </ul>
+                )}
+                {result.allocations.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-3">
+                    <Link href={`/matches/${recommendationRequirementId}`} className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-xs font-bold text-slate-700">
+                      Review matching details
+                    </Link>
+                    {recommendationOrganizationId && (
+                      <RequestExchangeButton
+                        requirementId={recommendationRequirementId}
+                        buyerOrganizationId={recommendationOrganizationId}
+                        className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-3 py-2 text-xs font-bold text-white hover:bg-slate-800 disabled:opacity-60"
+                      />
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+        </section>
+      )}
 
       <RequirementFormModal
         isOpen={modalOpen}

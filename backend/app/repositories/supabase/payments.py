@@ -1,4 +1,4 @@
-"""Supabase REST payments (table from migration 00005)."""
+"""Supabase REST payments (table from migration 00007)."""
 
 from __future__ import annotations
 

@@ -39,6 +39,17 @@ export interface MatchOverviewRow {
   result: MatchResult;
 }
 
+export interface TranscribeAudioInput {
+  audio_base64: string;
+  mime_type: string;
+  language: SpeechLanguage;
+}
+
+export interface TranscriptionResult {
+  transcript: string;
+  language: SpeechLanguage;
+}
+
 export type ListingInput = Record<string, unknown>;
 export type RequirementInput = Record<string, unknown>;
 
@@ -62,8 +73,8 @@ export const api = {
   },
 
   requirements: {
-    list: (filters: RequirementFilters = {}, signal?: AbortSignal) =>
-      apiRequest<MaterialRequirement[]>('/api/requirements', { query: { ...filters }, signal }).then((r) => ({
+    list: (filters: RequirementFilters = {}, signal?: AbortSignal, organizationId?: string) =>
+      apiRequest<MaterialRequirement[]>('/api/requirements', { query: { ...filters }, signal, organizationId }).then((r) => ({
         items: r.data,
         meta: (r.meta ?? {}) as RequirementListMeta,
       })),
@@ -82,8 +93,8 @@ export const api = {
     overview: (signal?: AbortSignal) =>
       apiRequest<MatchOverviewRow[]>('/api/matches', { signal }).then((r) => r.data),
     /** Match result plus the requirement it was computed for. */
-    get: (requirementId: string, signal?: AbortSignal) =>
-      apiRequest<MatchResult>(`/api/matches/${enc(requirementId)}`, { signal }).then((r) => ({
+    get: (requirementId: string, signal?: AbortSignal, organizationId?: string) =>
+      apiRequest<MatchResult>(`/api/matches/${enc(requirementId)}`, { signal, organizationId }).then((r) => ({
         result: r.data,
         requirement: (r.meta as { requirement?: MaterialRequirement } | undefined)?.requirement,
       })),
@@ -98,6 +109,16 @@ export const api = {
       apiRequest<ExchangeView>('/api/exchanges', {
         method: 'POST',
         body: { requirement_id: requirementId, buyer_organization_id: buyerOrganizationId },
+        organizationId: buyerOrganizationId,
+      }).then((r) => r.data),
+    requestListing: (listingId: string, quantity: number, buyerOrganizationId: string) =>
+      apiRequest<ExchangeView>('/api/exchanges', {
+        method: 'POST',
+        body: {
+          listing_id: listingId,
+          quantity,
+          buyer_organization_id: buyerOrganizationId,
+        },
         organizationId: buyerOrganizationId,
       }).then((r) => r.data),
     act: (exchangeId: string, action: ExchangeAction, organizationId: string, itemId?: string) =>

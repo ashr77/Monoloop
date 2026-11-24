@@ -43,7 +43,7 @@ class ExchangeView(ExchangeRecord):
     total_quantity: int
     total_value_bdt: float
     counts: ExchangeCounts
-    # Filled by ExchangeService when online payment is enabled (Member 4, migration 00005).
+    # Filled by ExchangeService when online payment is enabled (Member 4, migration 00007).
     payment: PaymentSummary | None = None
     payment_required: bool = False
 

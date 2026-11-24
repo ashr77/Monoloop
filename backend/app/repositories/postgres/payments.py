@@ -1,4 +1,4 @@
-"""PostgreSQL payments (table from migration 00005). Static, parameterised SQL only."""
+"""PostgreSQL payments (table from migration 00007). Static, parameterised SQL only."""
 
 from __future__ import annotations
 

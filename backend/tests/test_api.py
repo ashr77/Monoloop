@@ -87,6 +87,35 @@ async def test_t3_create_requirement(client):
     assert meta["total"] >= 1 and "pending_match_requirement_ids" in meta
 
 
+async def test_requirement_optional_dimension_ranges(client):
+    range_req = {
+        "organization_id": BUYER_APEX,
+        "material_family": "STAINLESS_STEEL_SHEET",
+        "material_specification": "SS304",
+        "length_min_mm": 1500,
+        "length_max_mm": 2000,
+        "width_min_mm": None,
+        "width_max_mm": None,
+        "thickness_min_mm": 2,
+        "thickness_max_mm": 3,
+        "required_quantity": 100,
+        "quantity_unit": "PIECE",
+    }
+    created = await client.post("/api/requirements", json=range_req, headers=as_org(BUYER_APEX))
+    assert created.status_code == 201
+    data = created.json()["data"]
+    assert data["length_min_mm"] == 1500 and data["length_max_mm"] == 2000
+    assert data["width_min_mm"] is None and data["width_max_mm"] is None
+
+    for bad in (
+        {**range_req, "length_min_mm": 2100, "length_max_mm": 2000},
+        {**range_req, "length_min_mm": None, "length_max_mm": 2000},
+        {**range_req, "length_mm": 1500, "length_min_mm": 1500, "length_max_mm": 2000},
+        {**range_req, "required_quantity": 0},
+    ):
+        assert (await client.post("/api/requirements", json=bad, headers=as_org(BUYER_APEX))).status_code == 400
+
+
 async def test_requirement_update_rules(client):
     r = await client.patch(f"/api/requirements/{SEED_REQ}", json={"required_quantity": 70}, headers=as_org(BUYER_DELTA))
     assert r.status_code == 403
@@ -94,6 +123,127 @@ async def test_requirement_update_rules(client):
     assert r.status_code == 200
     r = await client.patch(f"/api/requirements/{SEED_REQ}", json={"status": "OPEN"}, headers=as_org(BUYER_APEX))
     assert r.status_code == 409 and r.json()["error"]["code"] == "IMMUTABLE_STATUS"
+
+
+async def test_recommendation_match_for_created_requirement(client):
+    created = await client.post(
+        "/api/requirements",
+        json={**NEW_REQ, "length_mm": 2400, "width_mm": 1200, "thickness_mm": 2},
+        headers=as_org(BUYER_APEX),
+    )
+    requirement_id = created.json()["data"]["id"]
+    matched = await client.get(f"/api/matches/{requirement_id}", headers=as_org(BUYER_APEX))
+    assert matched.status_code == 200
+    result = matched.json()["data"]
+    assert result["evaluations"]
+    assert all(e["compatible"] or e["compatible"] is False for e in result["evaluations"])
+    assert sum(e["available_quantity"] for e in result["evaluations"] if e["compatible"]) > 0
+    assert matched.json()["meta"]["requirement"]["id"] == requirement_id
+
+    denied = await client.get(f"/api/matches/{requirement_id}", headers=as_org(BUYER_DELTA))
+    assert denied.status_code == 403
+    assert denied.json()["error"]["code"] == "FORBIDDEN_ORGANIZATION"
+
+
+async def test_partial_and_over_budget_recommendations_remain_visible(client):
+    partial = await client.post(
+        "/api/requirements",
+        json={
+            **NEW_REQ,
+            "length_mm": 2400,
+            "width_mm": 1200,
+            "thickness_mm": 2,
+            "required_quantity": 500,
+            "maximum_budget_bdt": 1,
+        },
+        headers=as_org(BUYER_APEX),
+    )
+    requirement_id = partial.json()["data"]["id"]
+    matched_response = await client.get(f"/api/matches/{requirement_id}", headers=as_org(BUYER_APEX))
+    assert matched_response.status_code == 200
+    matched = matched_response.json()["data"]
+    compatible = [e for e in matched["evaluations"] if e["compatible"]]
+    assert compatible
+    assert matched["budget"]["status"] == "OVER_BUDGET"
+    assert matched["over_budget_alternative"]
+
+
+# --------------------------------------------------------------------------- direct listing orders
+
+
+async def test_direct_listing_order_success_and_validation(client):
+    listing_id = "c1111111-1111-4111-c111-111111111111"
+    order = await client.post(
+        "/api/exchanges",
+        json={"listing_id": listing_id, "quantity": 10, "buyer_organization_id": BUYER_APEX},
+        headers=as_org(BUYER_APEX),
+    )
+    assert order.status_code == 201
+    exchange = order.json()["data"]
+    assert exchange["requirement_id"] is None
+    assert exchange["items"][0]["quantity"] == 10
+    assert exchange["items"][0]["status"] == "PENDING"
+    assert exchange["items"][0]["unit_price_bdt"] == 4200
+
+    for quantity in (0, -1):
+        bad = await client.post(
+            "/api/exchanges",
+            json={"listing_id": listing_id, "quantity": quantity, "buyer_organization_id": BUYER_APEX},
+            headers=as_org(BUYER_APEX),
+        )
+        assert bad.status_code == 400
+
+    too_many = await client.post(
+        "/api/exchanges",
+        json={"listing_id": listing_id, "quantity": 1000, "buyer_organization_id": BUYER_DELTA},
+        headers=as_org(BUYER_DELTA),
+    )
+    assert too_many.status_code == 409
+    assert too_many.json()["error"]["code"] == "INSUFFICIENT_STOCK"
+
+
+async def test_direct_listing_order_ownership_and_accept_reject(client):
+    listing_id = "c1111111-1111-4111-c111-111111111111"
+    own = await client.post(
+        "/api/exchanges",
+        json={"listing_id": listing_id, "quantity": 5, "buyer_organization_id": SUP_GAZIPUR},
+        headers=as_org(SUP_GAZIPUR),
+    )
+    assert own.status_code == 400
+
+    order = await client.post(
+        "/api/exchanges",
+        json={"listing_id": listing_id, "quantity": 12, "buyer_organization_id": BUYER_DELTA},
+        headers=as_org(BUYER_DELTA),
+    )
+    assert order.status_code == 201
+    exchange = order.json()["data"]
+    item = exchange["items"][0]
+
+    accepted = await client.post(
+        f"/api/exchanges/{exchange['id']}/accept",
+        json={"exchange_item_id": item["id"]},
+        headers=as_org(SUP_GAZIPUR),
+    )
+    assert accepted.status_code == 200
+    assert accepted.json()["data"]["items"][0]["status"] == "ACCEPTED"
+
+    rejected_listing = "c2222222-2222-4222-c222-222222222222"
+    rejected = await client.post(
+        "/api/exchanges",
+        json={"listing_id": rejected_listing, "quantity": 8, "buyer_organization_id": BUYER_APEX},
+        headers=as_org(BUYER_APEX),
+    )
+    assert rejected.status_code == 201
+    rejected_exchange = rejected.json()["data"]
+    rejected_item = rejected_exchange["items"][0]
+    declined = await client.post(
+        f"/api/exchanges/{rejected_exchange['id']}/reject",
+        json={"exchange_item_id": rejected_item["id"]},
+        headers=as_org("a2222222-2222-4222-a222-222222222222"),
+    )
+    assert declined.status_code == 200
+    assert declined.json()["data"]["items"][0]["status"] == "REJECTED"
 
 
 # --------------------------------------------------------------------------- matching (Member 3)
@@ -241,5 +391,16 @@ async def test_ai_extraction_mock_and_unconfigured(client):
     d = r["data"]
     assert d["material_specification"] == "SS304" and d["length_mm"] == 2400 and d["thickness_mm"] == 1.5
     assert d["total_quantity"] == 40 and d["city"] == "Gazipur" and d["unit_price_bdt"] == 4500
+    buyer_prompt = (
+        "I need around 100 pieces of SS304 stainless steel sheets. Length should be between 1500 and 2000 mm, "
+        "width between 800 and 1000 mm, and thickness can be 2 to 3 mm. The material should be in good condition."
+    )
+    buyer = (await client.post("/api/ai/extract-requirement", json={"prompt": buyer_prompt, "mock": True})).json()["data"]
+    assert buyer["material_specification"] == "SS304"
+    assert buyer["length_min_mm"] == 1500 and buyer["length_max_mm"] == 2000
+    assert buyer["width_min_mm"] == 800 and buyer["width_max_mm"] == 1000
+    assert buyer["thickness_min_mm"] == 2 and buyer["thickness_max_mm"] == 3
+    assert buyer["required_quantity"] == 100
+    assert buyer["condition_requirement"] == "UNUSED"
     r = (await client.post("/api/ai/extract-material", json={"prompt": prompt})).json()
     assert r["success"] is False and r["error"]["code"] == "AI_UNAVAILABLE"

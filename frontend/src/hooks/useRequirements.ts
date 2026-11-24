@@ -5,10 +5,10 @@ import { api, type RequirementFilters, type RequirementInput } from '@/lib/api/e
 import { queryKeys } from './queryKeys';
 
 /** Requirements plus exchange statistics (`meta`). */
-export function useRequirements(filters: RequirementFilters = {}) {
+export function useRequirements(filters: RequirementFilters = {}, organizationId?: string) {
   return useQuery({
-    queryKey: queryKeys.requirements.list(filters),
-    queryFn: ({ signal }) => api.requirements.list(filters, signal),
+    queryKey: [...queryKeys.requirements.list(filters), organizationId],
+    queryFn: ({ signal }) => api.requirements.list(filters, signal, organizationId),
   });
 }
 

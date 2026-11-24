@@ -1,7 +1,7 @@
 -- ============================================================================
 -- MONOLOOP - Payments for exchanges (Member 4)
 -- TSUNAGU Hackathon 2026
--- Migration: 00005_payments.sql   (safe to run more than once)
+-- Migration: 00007_payments.sql   (safe to run more than once)
 --
 -- One row per payment attempt. The buyer pays the full material value of a
 -- RESERVED exchange through SSLCommerz (sandbox in this prototype).

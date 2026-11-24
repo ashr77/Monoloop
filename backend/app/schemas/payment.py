@@ -13,7 +13,7 @@ PaymentStatus = Literal["INITIATED", "PAID", "FAILED", "CANCELLED"]
 
 
 class PaymentRecord(Entity):
-    """One payment attempt (table `payments`, migration 00005)."""
+    """One payment attempt (table `payments`, migration 00007)."""
 
     id: str
     exchange_id: str

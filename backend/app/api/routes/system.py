@@ -1,4 +1,4 @@
-"""Health check and AI extraction."""
+"""Health check, AI extraction and voice transcription."""
 
 from __future__ import annotations
 
