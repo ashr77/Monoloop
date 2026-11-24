@@ -13,15 +13,17 @@ import type { ChatMessage } from '../types';
 
 interface Props {
   conversationId: string;
-  /** Acting organization (demo identity), from ?as= */
+  /** Acting organization: the signed-in company, or the demo identity from ?as= */
   organizationId: string | null;
+  /** Demo mode only: show the buyer/supplier "Viewing as" switcher. */
+  allowSwitch?: boolean;
 }
 
 const time = (iso: string) =>
   new Date(iso).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 const shortName = (name?: string | null) => (name ?? '').replace(' (Buyer Demo)', '');
 
-export function ChatThread({ conversationId, organizationId }: Props) {
+export function ChatThread({ conversationId, organizationId, allowSwitch = true }: Props) {
   const router = useRouter();
   const { view, messages, query, send } = useConversationThread(conversationId, organizationId);
   const [draft, setDraft] = useState('');
@@ -107,7 +109,8 @@ export function ChatThread({ conversationId, organizationId }: Props) {
         >
           <ArrowLeft className="size-4" aria-hidden /> All messages
         </Link>
-        {/* Demo identity: flip between the two companies in this chat */}
+        {/* Demo identity: flip between the two companies in this chat (never when signed in) */}
+        {allowSwitch && (
         <div className="flex flex-wrap items-center gap-2">
           <span className="t-label">Viewing as</span>
           <div role="group" aria-label="Viewing as" className="inline-flex gap-0.5 rounded-sm border border-graphite/15 bg-cream-paper p-0.5">
@@ -129,6 +132,7 @@ export function ChatThread({ conversationId, organizationId }: Props) {
             )}
           </div>
         </div>
+        )}
       </div>
 
       {/* The listing this chat is about */}

@@ -125,7 +125,9 @@ function NavbarInner() {
   const signedIn = mode === 'jwt' && !!profile;
   const isAdmin = profile?.role === 'admin';
   const canBrowse = mode !== 'jwt' || isAdmin || profile?.organization?.status === 'APPROVED';
-  const primary = isAdmin ? [...PRIMARY, ADMIN] : PRIMARY;
+  // With login on, platform-wide Impact is for admins only.
+  const visible = PRIMARY.filter((e) => e.href !== '/impact' || mode !== 'jwt' || isAdmin);
+  const primary = isAdmin ? [...visible, ADMIN] : visible;
   const canCreate = canBrowse && !isAdmin;
 
   useEffect(() => {

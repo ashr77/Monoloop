@@ -265,3 +265,16 @@ async def test_admin_can_change_own_password(jwt_client):
     r = await jwt_client.post("/api/auth/password", json={"current_password": "admin-pass-1", "new_password": "admin-pass-2"},
                               headers=bearer(admin))
     assert r.status_code == 200
+
+
+async def test_impact_is_admin_only_with_login(jwt_client):
+    s = await approved_company(jwt_client)
+    r = await jwt_client.get("/api/impact", headers=bearer(s))
+    assert r.status_code == 403 and r.json()["error"]["code"] == "ADMIN_ONLY"
+    assert (await jwt_client.get("/api/impact")).status_code == 401
+    admin = await admin_session(jwt_client)
+    assert (await jwt_client.get("/api/impact", headers=bearer(admin))).status_code == 200
+
+
+async def test_impact_stays_public_in_demo_mode(client):
+    assert (await client.get("/api/impact")).status_code == 200

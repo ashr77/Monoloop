@@ -1,4 +1,7 @@
+'use client';
+
 import Link from 'next/link';
+import { useAuth } from '@/lib/auth/AuthProvider';
 import { Wordmark } from './Wordmark';
 
 const COLUMNS: { title: string; links: { href: string; label: string }[] }[] = [
@@ -29,6 +32,10 @@ const COLUMNS: { title: string; links: { href: string; label: string }[] }[] = [
 ];
 
 export function SiteFooter() {
+  const { mode, profile } = useAuth();
+  // With login on, Impact (resource recovery) is for admins only.
+  const hideImpact = mode === 'jwt' && profile?.role !== 'admin';
+  const columns = COLUMNS.map((c) => ({ ...c, links: c.links.filter((l) => !(hideImpact && l.href === '/impact')) }));
   return (
     <footer className="border-t border-graphite/10 bg-cream">
       <div className="page-shell grid gap-10 py-12 md:grid-cols-12">
@@ -40,7 +47,7 @@ export function SiteFooter() {
           </p>
         </div>
         <nav aria-label="Footer" className="grid grid-cols-2 gap-8 sm:grid-cols-3 md:col-span-7">
-          {COLUMNS.map((col) => (
+          {columns.map((col) => (
             <div key={col.title} className="space-y-3">
               <p className="t-label">{col.title}</p>
               <ul className="space-y-2">
