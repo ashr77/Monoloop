@@ -9,6 +9,7 @@ import type { ExchangeAction, ExchangeView, PaymentStart } from '@/features/exch
 import type { ImpactReport } from '@/features/analytics/impact';
 import type { ConversationSummary, ConversationView } from '@/features/chat/types';
 import type { MaterialExtractionResult, RequirementExtractionResult, SpeechLanguage } from '@/lib/ai/schemas';
+import type { AuthSession, CompanyRecord, Profile } from '@/lib/auth/session';
 import { apiRequest } from './client';
 
 export interface ListingFilters {
@@ -55,6 +56,15 @@ export type ListingInput = Record<string, unknown>;
 export type RequirementInput = Record<string, unknown>;
 
 const enc = encodeURIComponent;
+
+export interface SignupInput {
+  company_name: string;
+  city: string;
+  address?: string;
+  license_number: string;
+  email: string;
+  password: string;
+}
 
 export const api = {
   organizations: {
@@ -137,6 +147,33 @@ export const api = {
         method: 'POST',
         organizationId,
         timeoutMs: 30_000,
+      }).then((r) => r.data),
+  },
+
+  health: {
+    get: () =>
+      apiRequest<{ status: string; auth_mode?: 'demo' | 'jwt'; payment_configured?: boolean }>('/api/health').then(
+        (r) => r.data
+      ),
+  },
+
+  auth: {
+    signup: (body: SignupInput) =>
+      apiRequest<AuthSession>('/api/auth/signup', { method: 'POST', body, timeoutMs: 30_000 }).then((r) => r.data),
+    login: (email: string, password: string) =>
+      apiRequest<AuthSession>('/api/auth/login', { method: 'POST', body: { email, password } }).then((r) => r.data),
+    me: () => apiRequest<Profile>('/api/auth/me').then((r) => r.data),
+    resubmit: (body: Partial<Omit<SignupInput, 'email' | 'password'>>) =>
+      apiRequest<Profile>('/api/auth/application', { method: 'PATCH', body }).then((r) => r.data),
+  },
+
+  admin: {
+    applications: (status?: CompanyRecord['status'] | 'ALL', signal?: AbortSignal) =>
+      apiRequest<CompanyRecord[]>('/api/admin/organizations', { query: { status }, signal }).then((r) => r.data),
+    review: (organizationId: string, decision: 'approve' | 'reject' | 'suspend', reason?: string) =>
+      apiRequest<CompanyRecord>(`/api/admin/organizations/${enc(organizationId)}/${decision}`, {
+        method: 'POST',
+        body: decision === 'approve' ? undefined : { reason },
       }).then((r) => r.data),
   },
 

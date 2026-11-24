@@ -34,7 +34,8 @@ async def health(c: ContainerDep):
             database = f"unreachable ({type(exc).__name__})"
     return ok({"status": "ok", "data_backend": c.repos.backend, "database": database,
                "engine_version": ENGINE_VERSION, "ai_configured": c.settings.ai_configured,
-               "payment_configured": c.payments.enabled})
+               "payment_configured": c.payments.enabled,
+               "auth_mode": c.settings.auth_mode})
 
 
 @router.post("/ai/extract-material", response_model=ApiResponse[MaterialExtraction], tags=["supply"])

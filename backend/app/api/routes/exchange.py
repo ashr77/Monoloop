@@ -21,11 +21,17 @@ IdPath = Annotated[str, Path(max_length=64)]
 
 @router.get("/exchanges", response_model=ApiResponse[list[ExchangeView]])
 async def list_exchanges(
+    request: Request,
     c: ContainerDep,
     organization_id: Annotated[str | None, Query(max_length=64)] = None,
     status_: Annotated[ExchangeStatus | None, Query(alias="status")] = None,
 ):
-    """Exchanges where the organization is the buyer or supplies at least one item."""
+    """Exchanges where the organization is the buyer or supplies at least one item.
+    With AUTH_MODE=jwt a company always gets its own exchanges; admins may filter freely."""
+    if c.settings.auth_mode == "jwt":
+        actor = await resolve_actor(request, c.settings)
+        if actor is not None:  # company (admins: actor None, keep the requested filter)
+            organization_id = actor
     views = await c.exchanges.list(organization_id or None, status_)
     return ok(views, total=len(views))
 

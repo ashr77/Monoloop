@@ -41,6 +41,7 @@ from app.schemas.entities import (
     ExchangeRecord,
     Listing,
     Organization,
+    OrganizationRecord,
     Requirement,
     is_uuid,
 )
@@ -104,6 +105,11 @@ def safe_search_term(term: str) -> str:
     return " ".join(_SEARCH_UNSAFE.sub(" ", term).split())[:100]
 
 
+def _jsonable(data: dict) -> dict:
+    """datetimes -> ISO strings for the JSON body."""
+    return {k: (v.isoformat() if hasattr(v, "isoformat") else v) for k, v in data.items()}
+
+
 def _in(values: list[str] | tuple[str, ...]) -> str:
     return "in.(" + ",".join(values) + ")"
 
@@ -148,13 +154,40 @@ class SupabaseOrganizationRepository:
 
     async def list(self) -> list[Organization]:
         rows = await self.rest.get("organizations", {"select": "*", "order": "name.asc"})
-        return [Organization.model_validate(r) for r in rows]
+        return [OrganizationRecord.model_validate(r).public() for r in rows]
 
     async def get(self, organization_id: str) -> Organization | None:
+        rec = await self.get_record(organization_id)
+        return rec.public() if rec else None
+
+    async def create(self, data: dict) -> OrganizationRecord:
+        return OrganizationRecord.model_validate(await self.rest.insert("organizations", _jsonable(data)))
+
+    async def get_record(self, organization_id: str) -> OrganizationRecord | None:
         if not is_uuid(organization_id):
             return None
         rows = await self.rest.get("organizations", {"select": "*", "id": f"eq.{organization_id}"})
-        return Organization.model_validate(rows[0]) if rows else None
+        return OrganizationRecord.model_validate(rows[0]) if rows else None
+
+    async def list_records(self, status: str | None = None) -> list[OrganizationRecord]:
+        params = {"select": "*", "order": "created_at.desc"}
+        if status:
+            params["status"] = f"eq.{status}"
+        return [OrganizationRecord.model_validate(r) for r in await self.rest.get("organizations", params)]
+
+    async def find_conflict(self, email: str, license_number: str) -> str | None:
+        # ilike without wildcards = case-insensitive equality; inputs are already validated.
+        if await self.rest.get("organizations", {"select": "id", "contact_email": f"ilike.{email}"}):
+            return "email"
+        if await self.rest.get("organizations", {"select": "id", "license_number": f"ilike.{license_number}"}):
+            return "license"
+        return None
+
+    async def update(self, organization_id: str, changes: dict) -> OrganizationRecord | None:
+        if not is_uuid(organization_id):
+            return None
+        rows = await self.rest.patch("organizations", {"id": f"eq.{organization_id}"}, _jsonable(changes))
+        return OrganizationRecord.model_validate(rows[0]) if rows else None
 
 
 class SupabaseListingRepository:

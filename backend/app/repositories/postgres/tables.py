@@ -18,6 +18,12 @@ organizations = Table(
     Column("organization_type", Text, nullable=False),
     Column("city", Text, nullable=False),
     Column("address", Text),
+    Column("status", Text),
+    Column("license_number", Text),
+    Column("contact_email", Text),
+    Column("auth_user_id", ID),
+    Column("rejection_reason", Text),
+    Column("reviewed_at", TS),
     Column("created_at", TS),
 )
 

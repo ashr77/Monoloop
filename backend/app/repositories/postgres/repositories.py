@@ -36,6 +36,7 @@ from app.schemas.entities import (
     ExchangeRecord,
     Listing,
     Organization,
+    OrganizationRecord,
     Requirement,
     is_uuid,
 )
@@ -85,14 +86,49 @@ class PgOrganizationRepository:
     async def list(self) -> list[Organization]:
         async with self.engine.connect() as conn:
             rows = await conn.execute(select(organizations).order_by(organizations.c.name))
-        return [Organization.model_validate(dict(r._mapping)) for r in rows]
+        return [OrganizationRecord.model_validate(dict(r._mapping)).public() for r in rows]
 
     async def get(self, organization_id: str) -> Organization | None:
+        rec = await self.get_record(organization_id)
+        return rec.public() if rec else None
+
+    async def create(self, data: dict) -> OrganizationRecord:
+        async with self.engine.begin() as conn:
+            row = (await conn.execute(organizations.insert().values(**data).returning(organizations))).one()
+        return OrganizationRecord.model_validate(dict(row._mapping))
+
+    async def get_record(self, organization_id: str) -> OrganizationRecord | None:
         if not is_uuid(organization_id):
             return None
         async with self.engine.connect() as conn:
             row = (await conn.execute(select(organizations).where(organizations.c.id == organization_id))).first()
-        return Organization.model_validate(dict(row._mapping)) if row else None
+        return OrganizationRecord.model_validate(dict(row._mapping)) if row else None
+
+    async def list_records(self, status: str | None = None) -> list[OrganizationRecord]:
+        q = select(organizations).order_by(organizations.c.created_at.desc())
+        if status:
+            q = q.where(organizations.c.status == status)
+        async with self.engine.connect() as conn:
+            rows = await conn.execute(q)
+        return [OrganizationRecord.model_validate(dict(r._mapping)) for r in rows]
+
+    async def find_conflict(self, email: str, license_number: str) -> str | None:
+        async with self.engine.connect() as conn:
+            if (await conn.execute(select(organizations.c.id).where(
+                    func.lower(organizations.c.contact_email) == email.lower()))).first():
+                return "email"
+            if (await conn.execute(select(organizations.c.id).where(
+                    func.lower(organizations.c.license_number) == license_number.lower()))).first():
+                return "license"
+        return None
+
+    async def update(self, organization_id: str, changes: dict) -> OrganizationRecord | None:
+        if not is_uuid(organization_id):
+            return None
+        stmt = update(organizations).where(organizations.c.id == organization_id).values(**changes).returning(organizations)
+        async with self.engine.begin() as conn:
+            row = (await conn.execute(stmt)).first()
+        return OrganizationRecord.model_validate(dict(row._mapping)) if row else None
 
 
 class PgListingRepository:
