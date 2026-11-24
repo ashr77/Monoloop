@@ -5,6 +5,7 @@
 import Link from 'next/link';
 import { ArrowLeft, ArrowRight, Info } from 'lucide-react';
 import type { MaterialRequirement } from '@/lib/types';
+import { requirementSize } from '@/lib/dimensions';
 import type { MatchResult } from '../types';
 import { PALETTE, SPEC_LABEL, SUPPLIER_COLORS, bdt, num, t, unitNoun } from './theme';
 import { EvaluationTable } from './EvaluationTable';
@@ -61,7 +62,7 @@ export function MatchResultsView({ requirement, result }: Props) {
 
 function RequirementHeader({ requirement: r }: { requirement: MaterialRequirement }) {
   const facts: [string, string][] = [
-    ['Size', `${num(r.length_mm)} × ${num(r.width_mm)} × ${num(r.thickness_mm)} mm`],
+    ['Size', requirementSize(r)],
     ['Condition', r.condition_requirement === 'ANY' ? 'Any' : r.condition_requirement.toLowerCase()],
     ['Budget', r.maximum_budget_bdt == null ? 'No limit' : bdt(r.maximum_budget_bdt)],
     ['Sourcing', r.allow_split_suppliers ? 'Multi-supplier allowed' : 'Single supplier only'],

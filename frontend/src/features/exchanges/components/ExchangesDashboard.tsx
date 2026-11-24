@@ -7,6 +7,7 @@
 // ============================================================================
 
 import Link from 'next/link';
+import { requirementSize } from '@/lib/dimensions';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import {
@@ -413,7 +414,7 @@ function ExchangeCard({ ex, actingAs, highlighted, busy, onAct, onPay, onSwitch,
           </div>
           <h2 id={`ex-${ex.id}`} className="text-lg font-bold text-slate-900">
             {num(ex.total_quantity)} × {req ? SPEC_LABEL[req.material_specification] ?? req.material_specification : 'material'}{' '}
-            <span className="font-normal text-slate-500">{req ? dims(req) : ''}</span>
+            <span className="font-normal text-slate-500">{req ? requirementSize(req, '×') : ''}</span>
           </h2>
           <p className="text-sm text-slate-500">
             Buyer <strong className="text-slate-700">{ex.buyer?.name ?? orgName(ex.buyer_organization_id)}</strong>
