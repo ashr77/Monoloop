@@ -5,7 +5,7 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import Annotated, Literal
 
-from pydantic import Field, field_validator
+from pydantic import Field, ValidationInfo, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
@@ -65,6 +65,32 @@ class Settings(BaseSettings):
     ai_transcribe_model: str = ""
     ai_transcribe_endpoint: str = ""
     max_audio_bytes: int = Field(default=1_500_000, ge=10_000, le=15_000_000)
+
+    @field_validator("supabase_url", "supabase_service_role_key", "ai_api_key", "sslcommerz_store_id",
+                     "sslcommerz_store_password", "database_url", "public_api_url", "frontend_url", mode="before")
+    @classmethod
+    def _clean_pasted_value(cls, value: object, info: ValidationInfo) -> object:
+        # Dashboard copy/paste often adds spaces, a line break or wrapping quotes. Keys, ids and
+        # passwords never contain whitespace, so it is removed entirely; URLs are only trimmed.
+        if not isinstance(value, str):
+            return value
+        value = value.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+            value = value[1:-1].strip()
+        if not info.field_name.endswith("url"):
+            value = "".join(value.split())
+        return value
+
+    @field_validator("supabase_url")
+    @classmethod
+    def _check_supabase_url(cls, value: str) -> str:
+        value = value.rstrip("/")
+        for suffix in ("/rest/v1",):
+            if value.endswith(suffix):
+                value = value[: -len(suffix)]
+        if value and not value.startswith(("https://", "http://")):
+            raise ValueError("SUPABASE_URL must start with https:// (e.g. https://<ref>.supabase.co)")
+        return value
 
     @field_validator("cors_origins", mode="before")
     @classmethod

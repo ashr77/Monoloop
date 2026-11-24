@@ -19,6 +19,7 @@ Design notes
 from __future__ import annotations
 
 import asyncio
+import logging
 import re
 from typing import Any
 
@@ -47,6 +48,7 @@ from app.schemas.exchange import ExchangeView, build_view
 LISTING_SELECT = "*,organization:organizations!listings_organization_id_fkey(*)"
 REQUIREMENT_SELECT = "*,organization:organizations!requirements_organization_id_fkey(*)"
 RETURN_ROWS = {"Prefer": "return=representation"}
+logger = logging.getLogger("monoloop.supabase")
 
 _DB_ERROR = re.compile(r"MONOLOOP:([A-Z_]+):(.*)", re.S)
 _SEARCH_UNSAFE = re.compile(r"[^\w\s.\-]", re.UNICODE)
@@ -106,7 +108,9 @@ class _Rest:
         try:
             response = await self.client.request(method, path, **kwargs)
         except httpx.HTTPError as exc:
-            raise AppError("SERVICE_UNAVAILABLE", "Database API is unreachable.") from exc
+            # Type only: some httpx errors quote header values, which contain the service-role key.
+            logger.warning("Supabase REST %s %s failed: %s", method, path, type(exc).__name__)
+            raise AppError("SERVICE_UNAVAILABLE", f"Database API is unreachable ({type(exc).__name__}).") from exc
         if response.status_code >= 400:
             raise translate_rest_error(response)
         if response.status_code == 204 or not response.content:
