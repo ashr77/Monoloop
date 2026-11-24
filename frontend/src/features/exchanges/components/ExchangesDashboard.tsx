@@ -302,19 +302,13 @@ export function ExchangesDashboard() {
       </PageHeader>
 
       <div className="space-y-8 pt-8">
-        <Note>
-          <p>
-            <strong className="font-medium text-graphite">Requested → Accepted → Reserved → Completed.</strong> A match is
-            only a proposal. Stock is re-checked and reserved in a single database transaction when each supplier accepts,
-            so the same pieces can never be promised twice. Cancelling releases reservations; completing deducts inventory
-            exactly once.
-          </p>
-          {actingAs === 'ALL' && !identity.locked && (
-            <p className="mt-1 font-medium text-graphite">
+        {actingAs === 'ALL' && !identity.locked && (
+          <Note>
+            <p className="font-medium text-graphite">
               Choose an organization in &ldquo;Acting as&rdquo; to accept, decline, complete or cancel.
             </p>
-          )}
-        </Note>
+          </Note>
+        )}
 
         {/* Toolbar: filter tabs + sort */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">

@@ -18,15 +18,6 @@ export function Hero() {
       <div className="pointer-events-none absolute inset-0 bg-grid opacity-60 [mask-image:linear-gradient(to_bottom,black,transparent_85%)]" aria-hidden />
       <div className="page-shell relative grid items-center gap-12 pb-14 pt-14 sm:pt-20 lg:grid-cols-12 lg:gap-8 lg:pb-20 lg:pt-24">
         <div className="lg:col-span-6">
-          <motion.p
-            className="t-eyebrow flex items-center gap-3"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.6 }}
-          >
-            <span className="h-px w-8 bg-copper" aria-hidden />
-            TSUNAGU · Update the way we connect
-          </motion.p>
           <RevealText
             as="h1"
             className="mt-6 text-[clamp(2.75rem,5.2vw,4.75rem)] font-medium leading-[0.98] tracking-[-0.045em] text-graphite"
@@ -42,11 +33,7 @@ export function Hero() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.45, duration: 0.7, ease: EASE_OUT }}
           >
-            <p className="mt-7 max-w-[34rem] text-[17px] leading-relaxed text-slate-700">
-              Meguri connects manufacturers holding surplus sheets, offcuts and leftover stock with the businesses that need exactly
-              those specifications &mdash; checked rule by rule, allocated across suppliers, and exchanged against reserved stock.
-            </p>
-            <div className="mt-9 flex flex-wrap items-center gap-3">
+            <div className="mt-10 flex flex-wrap items-center gap-3">
               <LinkButton href="/supply?scope=all" size="lg" trailing={<ArrowRight className="size-4 transition-transform duration-base group-hover/btn:translate-x-0.5" />}>
                 Explore Marketplace
               </LinkButton>
@@ -77,20 +64,14 @@ const STAGES = [
   {
     n: '01',
     title: 'List or source materials',
-    body: 'Suppliers describe surplus in plain language or by voice; AI extraction drafts grade, dimensions and quantity for a person to review. Buyers publish exact specifications with ranges, budget and whether suppliers may combine.',
-    points: ['Natural-language and voice listing', 'Exact sizes or tolerances', 'Available = total − reserved'],
   },
   {
     n: '02',
     title: 'Find compatible matches',
-    body: 'Every listing is checked against eight mandatory rules — family, grade, size (including a 90° rotation), thickness, condition, stock, ownership and status. The cheapest delivered allocation is proposed, across suppliers when allowed.',
-    points: ['Pass / fail per rule, expected vs actual', 'Multi-supplier allocation', 'Budget and transport estimates'],
   },
   {
     n: '03',
     title: 'Coordinate the exchange',
-    body: 'The buyer requests the exchange. Each supplier accepts or declines its share and stock is reserved atomically. Pay online where enabled, talk it through in chat, then confirm the transfer.',
-    points: ['Atomic stock reservation', 'Buyer ↔ supplier chat', 'Full activity log'],
   },
 ];
 
@@ -99,8 +80,7 @@ export function HowItWorks() {
     <section aria-labelledby="how-heading" className="bg-sand-50">
       <div className="page-shell py-20 lg:py-28">
         <Reveal className="grid gap-6 lg:grid-cols-12">
-          <p className="t-eyebrow lg:col-span-3">How it works</p>
-          <h2 id="how-heading" className="text-display-md font-medium lg:col-span-9">
+          <h2 id="how-heading" className="text-display-md font-medium lg:col-span-12">
             Three steps from a factory&rsquo;s offcut rack to another&rsquo;s production line.
           </h2>
         </Reveal>
@@ -131,15 +111,6 @@ export function HowItWorks() {
                 </span>
                 <p className="font-mono text-sm text-copper-700">{s.n}</p>
                 <h3 className="mt-2 text-heading-md font-medium">{s.title}</h3>
-                <p className="mt-3 text-[15px] leading-relaxed text-slate-700">{s.body}</p>
-                <ul className="mt-5 space-y-2 border-t border-graphite/10 pt-4">
-                  {s.points.map((p) => (
-                    <li key={p} className="flex items-center gap-2.5 text-sm text-graphite">
-                      <span className="h-px w-3 bg-copper" aria-hidden />
-                      {p}
-                    </li>
-                  ))}
-                </ul>
               </motion.li>
             ))}
           </ol>

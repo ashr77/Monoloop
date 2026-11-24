@@ -41,10 +41,6 @@ export function SiteFooter() {
       <div className="page-shell grid gap-10 py-12 md:grid-cols-12">
         <div className="space-y-4 md:col-span-5">
           <Wordmark />
-          <p className="max-w-sm text-sm leading-relaxed text-slate-600">
-            Industrial surplus matching and resource exchange. Built for the TSUNAGU Hackathon 2026 &mdash;{' '}
-            <span className="text-graphite">Update the Way We Connect.</span>
-          </p>
         </div>
         <nav aria-label="Footer" className="grid grid-cols-2 gap-8 sm:grid-cols-3 md:col-span-7">
           {columns.map((col) => (

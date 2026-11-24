@@ -7,8 +7,8 @@ import { ArrowRight, Recycle } from 'lucide-react';
 import type { ReactNode } from 'react';
 import type { Organization } from '@/lib/types';
 import type { ImpactReport } from '../impact';
-import { FAMILY_LABEL, bdt, formatDate, num } from '@/features/exchanges/components/format';
-import { EmptyState, FactList, LinkButton, MetricStrip, Note, PageHeader, SectionHeading } from '@/components/ui';
+import { FAMILY_LABEL, bdt, num } from '@/features/exchanges/components/format';
+import { EmptyState, FactList, LinkButton, MetricStrip, PageHeader } from '@/components/ui';
 import { OrgScopeSelect } from './OrgScopeSelect';
 
 interface Props {
@@ -26,14 +26,12 @@ export function ImpactDashboard({ report, organizations, scopeName }: Props) {
       <PageHeader
         eyebrow="Resource recovery"
         title={scopeName ? `Impact: ${scopeName}` : 'Platform resource recovery'}
-        description="Materials that moved from one business’s surplus into another’s production."
         actions={<OrgScopeSelect organizations={organizations} value={report.scope.organization_id} />}
       />
 
       <div className="space-y-14 pt-10">
         {/* Headline: completed reuse only */}
-        <section aria-labelledby="recovered-heading" className="space-y-5">
-          <SectionHeading id="recovered-heading" title="Confirmed reuse" hint="Completed exchanges only" />
+        <section aria-label="Confirmed reuse">
           <MetricStrip
             metrics={[
               {
@@ -78,7 +76,7 @@ export function ImpactDashboard({ report, organizations, scopeName }: Props) {
         {/* Breakdown */}
         {!empty && (
           <div className="grid grid-cols-1 gap-x-12 gap-y-10 lg:grid-cols-2">
-            <Block id="by-family" title="Reused by material" subtitle="Value recovered (BDT)">
+            <Block id="by-family" title="Reused by material">
               <BarList
                 rows={report.by_family.map((f) => ({
                   key: f.material_family,
@@ -89,7 +87,7 @@ export function ImpactDashboard({ report, organizations, scopeName }: Props) {
                 }))}
               />
             </Block>
-            <Block id="by-supplier" title="Supplier contributions" subtitle="Value of surplus each supplier put back into use (BDT)">
+            <Block id="by-supplier" title="Supplier contributions">
               <BarList
                 rows={report.top_suppliers.map((s) => ({
                   key: s.organization_id,
@@ -105,7 +103,7 @@ export function ImpactDashboard({ report, organizations, scopeName }: Props) {
 
         {/* Pipeline & inventory */}
         <div className="grid grid-cols-1 gap-x-12 gap-y-10 lg:grid-cols-2">
-          <Block id="pipeline" title="In the pipeline" subtitle="Not yet counted as reuse">
+          <Block id="pipeline" title="In the pipeline">
             <FactList
               facts={[
                 { label: 'Awaiting suppliers', value: <Figure>{num(pipeline.awaiting_suppliers)}</Figure> },
@@ -119,7 +117,7 @@ export function ImpactDashboard({ report, organizations, scopeName }: Props) {
               ]}
             />
           </Block>
-          <Block id="inventory" title="Surplus still available" subtitle="Active listings right now">
+          <Block id="inventory" title="Surplus still available">
             <FactList
               facts={[
                 { label: 'Active listings', value: <Figure>{num(inventory.active_listings)}</Figure> },
@@ -131,48 +129,7 @@ export function ImpactDashboard({ report, organizations, scopeName }: Props) {
           </Block>
         </div>
 
-        {/* Recent completed */}
-        {!empty && (
-          <section aria-labelledby="recent-heading" className="space-y-5">
-            <SectionHeading id="recent-heading" title="Recently completed exchanges" />
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[40rem] text-sm">
-                <thead>
-                  <tr className="border-y rule text-left">
-                    <th scope="col" className="t-label py-2.5 pr-4 font-medium">Completed</th>
-                    <th scope="col" className="t-label py-2.5 pr-4 font-medium">Buyer</th>
-                    <th scope="col" className="t-label py-2.5 pr-4 font-medium">Material</th>
-                    <th scope="col" className="t-label py-2.5 pr-4 font-medium">Suppliers</th>
-                    <th scope="col" className="t-label py-2.5 pr-4 text-right font-medium">Pieces</th>
-                    <th scope="col" className="t-label py-2.5 text-right font-medium">Value</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-graphite/[0.08] border-b rule">
-                  {report.recent_completed.map((r) => (
-                    <tr key={r.id}>
-                      <td className="whitespace-nowrap py-3 pr-4 font-mono text-xs text-slate-600">{formatDate(r.completed_at)}</td>
-                      <td className="py-3 pr-4 font-medium text-graphite">{r.buyer_name}</td>
-                      <td className="py-3 pr-4 text-slate-700">{r.material}</td>
-                      <td className="py-3 pr-4 text-slate-700">{r.suppliers.join(', ')}</td>
-                      <td className="py-3 pr-4 text-right tabular-nums text-graphite">{num(r.units)}</td>
-                      <td className="py-3 text-right font-medium tabular-nums text-graphite">{bdt(r.value_bdt)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </section>
-        )}
 
-        {/* Assumptions */}
-        <Note>
-          <p className="font-medium text-graphite">How these figures are calculated</p>
-          <ul className="mt-1.5 list-disc space-y-0.5 pl-4">
-            {report.assumptions.map((a) => (
-              <li key={a}>{a}</li>
-            ))}
-          </ul>
-        </Note>
       </div>
     </div>
   );
