@@ -1,7 +1,9 @@
-# MONOLOOP backend (FastAPI) on Render - Blueprint (render.com/docs/blueprint-spec)
-# Dashboard -> New -> Blueprint -> pick this repo. Render asks for every `sync: false`
-# value on the first deploy; secrets never live in this file.
-# The frontend deploys separately on Vercel (root directory: frontend).
+# MONOLOOP on Render - Blueprint (render.com/docs/blueprint-spec)
+#   monoloop-api : FastAPI backend   (rootDir backend)
+#   monoloop-web : Next.js frontend  (rootDir frontend)
+# Dashboard -> Blueprints -> this repo. Render asks for every `sync: false` value on the
+# first deploy; secrets never live in this file. A push to main redeploys the service
+# whose directory changed.
 
 services:
   - type: web
@@ -50,10 +52,28 @@ services:
 
       # Public URLs: fill in after both services exist, e.g.
       #   PUBLIC_API_URL = https://monoloop-api.onrender.com
-      #   FRONTEND_URL / CORS_ORIGINS = https://<your-app>.vercel.app
+      #   FRONTEND_URL / CORS_ORIGINS = https://monoloop-web.onrender.com
       - key: PUBLIC_API_URL
         sync: false
       - key: FRONTEND_URL
         sync: false
       - key: CORS_ORIGINS
         sync: false
+
+  - type: web
+    name: monoloop-web
+    runtime: node
+    rootDir: frontend
+    region: singapore
+    plan: free  # sleeps after 15 min idle like the API; open both URLs before a demo
+    buildCommand: npm ci && npm run build
+    startCommand: npm run start -- --port $PORT
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: NEXT_TELEMETRY_DISABLED
+        value: "1"
+      # Read at build time and baked into the browser bundle (public, not a secret).
+      - key: NEXT_PUBLIC_API_URL
+        value: https://monoloop-api.onrender.com
