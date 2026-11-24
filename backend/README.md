@@ -6,7 +6,7 @@ Every API endpoint of MONOLOOP: supply, demand, explainable matching, exchanges 
 python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
 cp .env.example .env
 .venv/bin/uvicorn app.main:app --reload --port 8000     # interactive docs: http://localhost:8000/docs
-.venv/bin/pytest                                         # 106 tests (+15 opt-in: live Supabase, chat rules on PostgreSQL)
+.venv/bin/pytest                                         # full suite (+15 opt-in: live Supabase, chat rules on PostgreSQL)
 .venv/bin/ruff check app tests
 ```
 
@@ -22,7 +22,7 @@ With `DATA_BACKEND=auto`: Postgres if `DATABASE_URL` is set, otherwise Supabase 
 
 Live check of the `supabase` backend (writes one CANCELLED exchange, leaves stock unchanged): `MONOLOOP_LIVE_SUPABASE=1 .venv/bin/pytest tests/test_supabase_live.py`
 
-Apply `../supabase/migrations/00001` → `00008` first. The schema lives only in those migrations; `app/repositories/postgres/tables.py` describes it and never alters it. `GET /api/health` reports the active backend and whether the database answers.
+Apply every file in `../supabase/migrations` in order first (`00001` → `00010`). The schema lives only in those migrations; `app/repositories/postgres/tables.py` describes it and never alters it. `GET /api/health` reports the active backend and whether the database answers.
 
 ## Architecture
 
