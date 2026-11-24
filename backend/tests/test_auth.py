@@ -167,3 +167,18 @@ async def test_company_sees_only_its_own_exchanges(jwt_client):
     await jwt_client.post(f"/api/admin/organizations/{org_id}/approve", headers=bearer(admin))
     r = await jwt_client.get(f"/api/exchanges?organization_id={SUP_GAZIPUR}", headers=bearer(s))
     assert r.status_code == 200 and r.json()["data"] == []
+
+
+async def test_demo_accounts_for_existing_companies(jwt_client):
+    auth = jwt_client._transport.app.state.container.auth  # type: ignore[attr-defined]
+    created = await auth.ensure_demo_accounts("demo-pass-1")
+    emails = {e for _, e in created}
+    assert "gazipur@monoloop.demo" in emails and "apex@monoloop.demo" in emails
+    assert await auth.ensure_demo_accounts("demo-pass-1") == []  # idempotent
+
+    s = (await jwt_client.post("/api/auth/login", json={"email": "gazipur@monoloop.demo",
+                                                         "password": "demo-pass-1"})).json()["data"]
+    assert s["profile"]["organization"]["id"] == SUP_GAZIPUR
+    assert s["profile"]["organization"]["status"] == "APPROVED"
+    r = await jwt_client.post("/api/listings", json={**listing_for(SUP_GAZIPUR), "city": "Gazipur"}, headers=bearer(s))
+    assert r.status_code == 201, r.text

@@ -135,5 +135,33 @@ class AuthService:
         assert updated is not None
         return updated
 
+    async def ensure_demo_accounts(self, password: str, domain: str = "monoloop.demo") -> list[tuple[str, str]]:
+        """Give every existing company without a login one: <first word of name>@<domain>, APPROVED.
+        Idempotent: companies that already have a login are skipped. Returns (company, email)."""
+        created: list[tuple[str, str]] = []
+        used: set[str] = set()
+        for org in sorted(await self.repos.organizations.list_records(), key=lambda o: o.id):
+            if org.auth_user_id:
+                continue
+            slug = "".join(ch for ch in org.name.split()[0].lower() if ch.isalnum()) or "company"
+            local, n = slug, 2
+            while local in used:
+                local, n = f"{slug}{n}", n + 1
+            used.add(local)
+            email = f"{local}@{domain}"
+            try:
+                user_id = await self.provider.create_user(email, password,
+                                                          {"organization_id": org.id, "role": "company"})
+            except AppError as exc:
+                if exc.code == "EMAIL_TAKEN":
+                    continue  # created earlier but not linked: leave it for a manual fix
+                raise
+            await self.repos.organizations.update(org.id, {
+                "contact_email": email, "auth_user_id": user_id, "status": "APPROVED",
+                "license_number": org.license_number or f"DEMO-{org.id[:8].upper()}",
+            })
+            created.append((org.name, email))
+        return created
+
     async def create_admin(self, email: str, password: str) -> str:
         return await self.provider.create_user(email.lower(), password, {"role": "admin"})

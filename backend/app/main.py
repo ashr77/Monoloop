@@ -34,8 +34,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def lifespan(app: FastAPI):
         container = build_container(settings)
         app.state.container = container
-        if settings.bootstrap_admin_email and container.auth.provider.name == "local":
-            await container.auth.create_admin(settings.bootstrap_admin_email, settings.bootstrap_admin_password)
+        if container.auth.provider.name == "local":  # offline demo logins (never used with Supabase)
+            if settings.bootstrap_admin_email:
+                await container.auth.create_admin(settings.bootstrap_admin_email, settings.bootstrap_admin_password)
+            if settings.bootstrap_demo_password:
+                for name, email in await container.auth.ensure_demo_accounts(settings.bootstrap_demo_password):
+                    logger.info("Demo login: %s -> %s", email, name)
         logger.info("MONOLOOP API started (data backend: %s, auth: %s)", container.repos.backend, settings.auth_mode)
         yield
         await container.aclose()
