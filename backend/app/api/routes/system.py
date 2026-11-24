@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+
 from fastapi import APIRouter
 from sqlalchemy import text
 
@@ -35,7 +37,9 @@ async def health(c: ContainerDep):
     return ok({"status": "ok", "data_backend": c.repos.backend, "database": database,
                "engine_version": ENGINE_VERSION, "ai_configured": c.settings.ai_configured,
                "payment_configured": c.payments.enabled,
-               "auth_mode": c.settings.auth_mode})
+               "auth_mode": c.settings.auth_mode,
+               # Render sets RENDER_GIT_COMMIT: shows which commit is live (used by the deploy workflow).
+               "commit": os.environ.get("RENDER_GIT_COMMIT", "")[:40] or None})
 
 
 @router.post("/ai/extract-material", response_model=ApiResponse[MaterialExtraction], tags=["supply"])
