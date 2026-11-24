@@ -73,7 +73,7 @@ export function Segmented<T extends string>({
             className={cn(
               'relative inline-flex items-center gap-1.5 whitespace-nowrap font-medium transition-colors duration-fast',
               variant === 'pill'
-                ? cn(size === 'sm' ? 'h-7 px-2.5 text-xs' : 'h-8 px-3 text-[13px]', 'rounded-xs', active ? 'text-cream' : 'text-slate-600 hover:text-graphite')
+                ? cn(size === 'sm' ? 'h-7 px-2.5 text-xs' : 'h-8 px-3 text-[14px]', 'rounded-xs', active ? 'text-cream' : 'text-slate-600 hover:text-graphite')
                 : cn('-mb-px pb-3 pt-1 text-sm', active ? 'text-graphite' : 'text-slate-600 hover:text-graphite')
             )}
           >
@@ -88,7 +88,7 @@ export function Segmented<T extends string>({
             <span className="relative z-10 inline-flex items-center gap-1.5">
               {o.label}
               {o.count !== undefined && (
-                <span className={cn('font-mono text-[11px] tabular-nums', active && variant === 'pill' ? 'text-cream/70' : 'text-slate-500')}>
+                <span className={cn('font-mono text-xs tabular-nums', active && variant === 'pill' ? 'text-cream/70' : 'text-slate-500')}>
                   {o.count}
                 </span>
               )}

@@ -139,7 +139,7 @@ export function Menu({
           }
         }}
         className={cn(
-          'inline-flex h-8 items-center gap-1.5 rounded-sm border border-graphite/15 bg-cream-paper px-2.5 text-[13px] font-medium text-graphite transition-colors duration-fast hover:border-graphite/35',
+          'inline-flex h-8 items-center gap-1.5 rounded-sm border border-graphite/15 bg-cream-paper px-2.5 text-[14px] font-medium text-graphite transition-colors duration-fast hover:border-graphite/35',
           open && 'border-graphite/40',
           triggerClassName
         )}
@@ -184,7 +184,7 @@ export function Menu({
 }
 
 const itemClass =
-  'flex w-full cursor-pointer items-center gap-2.5 rounded-sm px-2.5 py-2 text-left text-[13px] text-graphite outline-none transition-colors duration-fast hover:bg-graphite/[0.05] focus:bg-graphite/[0.06] aria-disabled:cursor-not-allowed aria-disabled:opacity-50';
+  'flex w-full cursor-pointer items-center gap-2.5 rounded-sm px-2.5 py-2 text-left text-[14px] text-graphite outline-none transition-colors duration-fast hover:bg-graphite/[0.05] focus:bg-graphite/[0.06] aria-disabled:cursor-not-allowed aria-disabled:opacity-50';
 
 export function MenuItem({
   children,
@@ -334,7 +334,7 @@ export function Popover({
         aria-label={label}
         onClick={() => setOpen((v) => !v)}
         className={cn(
-          'inline-flex h-8 items-center gap-1.5 rounded-sm border px-2.5 text-[13px] font-medium transition-colors duration-fast',
+          'inline-flex h-8 items-center gap-1.5 rounded-sm border px-2.5 text-[14px] font-medium transition-colors duration-fast',
           active ? 'border-copper/60 bg-copper-50 text-copper-800' : 'border-graphite/15 bg-cream-paper text-graphite hover:border-graphite/35',
           open && 'border-graphite/40',
           triggerClassName

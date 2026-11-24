@@ -77,7 +77,7 @@ export default function PendingPage() {
         <div className="space-y-5 border-y rule py-5">
           <div className="flex items-center justify-between gap-3">
             <span className="t-label">Application status</span>
-            <StatusBadge tone={head.tone} solid>
+            <StatusBadge tone={head.tone}>
               {head.badge}
             </StatusBadge>
           </div>

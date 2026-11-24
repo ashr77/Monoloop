@@ -280,7 +280,7 @@ export function HeroNetwork() {
           initial={{ opacity: 0, y: 4 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, ease: EASE_OUT }}
-          className="font-mono text-[11px] uppercase tracking-[0.08em] text-slate-600"
+          className="font-mono text-xs uppercase tracking-[0.08em] text-slate-600"
         >
           {sc.caption}
         </motion.p>

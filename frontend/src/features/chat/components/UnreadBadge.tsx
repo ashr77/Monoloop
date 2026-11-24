@@ -9,7 +9,7 @@ export function UnreadBadge() {
   if (!unread) return null;
   return (
     <span
-      className="inline-flex h-[1.125rem] min-w-[1.125rem] items-center justify-center rounded-xs bg-copper-600 px-1 font-mono text-[10.5px] font-medium tabular-nums leading-none text-white"
+      className="inline-flex h-[1.125rem] min-w-[1.125rem] items-center justify-center rounded-xs bg-copper-600 px-1 font-mono text-[11px] font-medium tabular-nums leading-none text-white"
       aria-label={`${unread} unread messages`}
       role="status"
     >

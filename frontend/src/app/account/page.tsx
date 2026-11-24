@@ -48,7 +48,7 @@ export default function AccountPage() {
         description={profile.email}
         actions={
           status ? (
-            <StatusBadge tone={status.tone} solid>
+            <StatusBadge tone={status.tone}>
               {status.label}
             </StatusBadge>
           ) : (

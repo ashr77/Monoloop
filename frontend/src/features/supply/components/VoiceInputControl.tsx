@@ -61,7 +61,7 @@ export function VoiceInputControl({ onTranscript, disabled }: Props) {
           <button
             type="button"
             onClick={voice.stop}
-            className="inline-flex h-8 items-center gap-2 rounded-sm border border-copper-600 bg-copper-50 px-3 text-[13px] font-medium text-copper-800 transition-colors duration-fast hover:bg-copper-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-copper"
+            className="inline-flex h-8 items-center gap-2 rounded-sm border border-copper-600 bg-copper-50 px-3 text-[14px] font-medium text-copper-800 transition-colors duration-fast hover:bg-copper-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-copper"
           >
             {/* Recording indicator: the only continuous motion, shown only while capturing audio. */}
             <span className="relative flex size-2" aria-hidden>

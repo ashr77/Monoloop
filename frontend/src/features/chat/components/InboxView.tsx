@@ -93,7 +93,7 @@ export function InboxView() {
                         <Tag className="shrink-0">{c.role === 'BUYER' ? 'Supplier' : 'Buyer'}</Tag>
                       </div>
                       {c.listing && (
-                        <p className="truncate text-[13px] text-slate-600">
+                        <p className="truncate text-[14px] text-slate-600">
                           {c.listing.material_specification} ·{' '}
                           <span className="font-mono text-xs">
                             {c.listing.length_mm} × {c.listing.width_mm} × {c.listing.thickness_mm} mm
@@ -105,11 +105,11 @@ export function InboxView() {
                       </p>
                     </div>
                     <div className="flex shrink-0 flex-col items-end gap-2">
-                      <time dateTime={c.last_message_at} className="font-mono text-[11px] tabular-nums text-slate-600">
+                      <time dateTime={c.last_message_at} className="font-mono text-xs tabular-nums text-slate-600">
                         {time(c.last_message_at)}
                       </time>
                       {c.unread > 0 && (
-                        <StatusBadge tone="copper" solid>
+                        <StatusBadge tone="copper">
                           {c.unread} unread
                         </StatusBadge>
                       )}

@@ -49,6 +49,7 @@ import {
 } from '@/components/ui';
 import { SPEC_LABEL, bdt, num } from '@/features/exchanges/components/format';
 import { useOpenConversation, useSaveListing } from '@/hooks';
+import { useMediaQuery, WIDE_TABLES } from '@/hooks/useMediaQuery';
 import { sortBy, useIncremental, usePersistentState } from '@/hooks/useViewPrefs';
 import { errorMessage } from '@/lib/api/client';
 import { ALL_SPECIFICATIONS, MATERIAL_CONDITIONS, MaterialFamily } from '@/lib/constants';
@@ -119,7 +120,10 @@ export function SupplierListingTable({
   const [minAvailable, setMinAvailable] = useState('');
   // Persisted view preferences
   const [sort, setSort] = usePersistentState<SortId>('supply.sort', 'newest');
-  const [view, setView] = usePersistentState<'list' | 'grid'>('supply.view', 'list');
+  const [savedView, setView] = usePersistentState<'list' | 'grid'>('supply.view', 'list');
+  // The table needs ~900px; narrower screens (phones, half-width windows) always get the cards.
+  const wide = useMediaQuery(WIDE_TABLES);
+  const view = wide ? savedView : 'grid';
   const [density, setDensity] = usePersistentState<'comfortable' | 'compact'>('supply.density', 'comfortable');
   const [hidden, setHidden] = usePersistentState<ColumnId[]>('supply.hiddenColumns', []);
 
@@ -340,7 +344,7 @@ export function SupplierListingTable({
               trigger={
                 <>
                   <SlidersHorizontal className="size-3.5" aria-hidden /> Filters
-                  {refinementCount > 0 && <span className="font-mono text-[11px]">{refinementCount}</span>}
+                  {refinementCount > 0 && <span className="font-mono text-xs">{refinementCount}</span>}
                 </>
               }
             >
@@ -437,7 +441,7 @@ export function SupplierListingTable({
                   ))}
               </ToolbarSelect>
             )}
-            <Menu label="Sort listings" align="end" width="w-56" trigger={<span className="text-[13px]">Sort: {SORTS.find((s) => s.id === sort)?.short}</span>}>
+            <Menu label="Sort listings" align="end" width="w-56" trigger={<span className="text-[14px]">Sort: {SORTS.find((s) => s.id === sort)?.short}</span>}>
               <MenuLabel>Sort by</MenuLabel>
               {SORTS.map((s) => (
                 <MenuCheckItem key={s.id} radio checked={sort === s.id} onCheckedChange={() => setSort(s.id)}>
@@ -445,7 +449,7 @@ export function SupplierListingTable({
                 </MenuCheckItem>
               ))}
             </Menu>
-            {view === 'list' && (
+            {wide && view === 'list' && (
               <Menu label="Table options" align="end" width="w-56" trigger={<Columns3 className="size-3.5" aria-hidden />}>
                 <MenuLabel>Density</MenuLabel>
                 <MenuCheckItem radio checked={!compact} onCheckedChange={() => setDensity('comfortable')} keepOpen>
@@ -467,15 +471,17 @@ export function SupplierListingTable({
                 ))}
               </Menu>
             )}
-            <Segmented
-              label="Layout"
-              value={view}
-              onChange={setView}
-              options={[
-                { value: 'list', label: <List className="size-3.5" />, ariaLabel: 'List view' },
-                { value: 'grid', label: <LayoutGrid className="size-3.5" />, ariaLabel: 'Grid view' },
-              ]}
-            />
+            {wide && (
+              <Segmented
+                label="Layout"
+                value={view}
+                onChange={setView}
+                options={[
+                  { value: 'list', label: <List className="size-3.5" />, ariaLabel: 'List view' },
+                  { value: 'grid', label: <LayoutGrid className="size-3.5" />, ariaLabel: 'Grid view' },
+                ]}
+              />
+            )}
           </div>
         </div>
 
@@ -535,7 +541,7 @@ export function SupplierListingTable({
                     </div>
                     <StatusBadge tone={STATUS_TONE[item.status] ?? 'neutral'}>{item.status.toLowerCase()}</StatusBadge>
                   </div>
-                  <dl className="grid grid-cols-2 gap-3 text-[13px]">
+                  <dl className="grid grid-cols-2 gap-3 text-[14px]">
                     <div>
                       <dt className="t-label">Size · mm</dt>
                       <dd className="font-mono text-graphite">{dimsOf(item)}</dd>
@@ -583,7 +589,7 @@ export function SupplierListingTable({
                   <th scope="col" className="t-label pb-2 text-right font-medium">Actions</th>
                 </tr>
               </thead>
-              <tbody className="text-[13px] text-graphite">
+              <tbody className="text-[14px] text-graphite">
                 <AnimatePresence initial={false}>
                   {visible.map((item) => {
                     const isArchived = item.status === 'ARCHIVED';
@@ -662,9 +668,9 @@ export function SupplierListingTable({
                                 <div className="grid gap-6 pt-1 md:grid-cols-3">
                                   <div className="space-y-1 md:col-span-2">
                                     <p className="t-label">Description</p>
-                                    <p className="text-[13px] leading-relaxed text-graphite/90">{item.description || 'No description provided.'}</p>
+                                    <p className="text-[14px] leading-relaxed text-graphite/90">{item.description || 'No description provided.'}</p>
                                   </div>
-                                  <dl className="grid grid-cols-2 gap-3 text-[13px]">
+                                  <dl className="grid grid-cols-2 gap-3 text-[14px]">
                                     <div>
                                       <dt className="t-label">Total</dt>
                                       <dd className="tabular-nums">{num(item.total_quantity)} pcs</dd>

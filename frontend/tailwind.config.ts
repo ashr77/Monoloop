@@ -88,7 +88,10 @@ const config: Config = {
         'display-md': ['clamp(2rem, 3.6vw, 3.25rem)', { lineHeight: '1.04', letterSpacing: '-0.035em' }],
         'heading-lg': ['clamp(1.75rem, 2.6vw, 2.25rem)', { lineHeight: '1.1', letterSpacing: '-0.03em' }],
         'heading-md': ['1.375rem', { lineHeight: '1.2', letterSpacing: '-0.02em' }],
-        label: ['0.6875rem', { lineHeight: '1rem', letterSpacing: '0.08em' }],
+        label: ['0.75rem', { lineHeight: '1.1rem', letterSpacing: '0.08em' }],
+        // Body sizes one step larger than Tailwind's defaults (12/14px read too small on phones).
+        xs: ['0.8125rem', { lineHeight: '1.25rem' }],
+        sm: ['0.9375rem', { lineHeight: '1.45rem' }],
       },
       maxWidth: {
         page: '80rem', // application + marketing content width

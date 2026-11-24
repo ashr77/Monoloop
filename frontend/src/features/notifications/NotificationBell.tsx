@@ -236,13 +236,13 @@ export function NotificationBell() {
                           </span>
                           <span className="min-w-0 flex-1">
                             <span className="flex items-start justify-between gap-2">
-                              <span className={cn('text-[13px] leading-snug text-graphite', n.read ? 'font-normal' : 'font-medium')}>
+                              <span className={cn('text-[14px] leading-snug text-graphite', n.read ? 'font-normal' : 'font-medium')}>
                                 {n.title}
                               </span>
                               {!n.read && <span className="mt-1.5 size-2 shrink-0 rounded-full bg-copper-600" aria-label="Unread" />}
                             </span>
                             <span className="mt-0.5 line-clamp-2 block text-xs leading-relaxed text-slate-600">{n.message}</span>
-                            <span className="mt-1 block font-mono text-[11px] text-slate-500">{timeAgo(n.created_at)}</span>
+                            <span className="mt-1 block font-mono text-xs text-slate-500">{timeAgo(n.created_at)}</span>
                           </span>
                         </button>
                       </li>

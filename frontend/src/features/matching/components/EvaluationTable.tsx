@@ -165,7 +165,7 @@ export function EvaluationTable({ evaluations, overBudget = false }: { evaluatio
                                     {x.passed ? 'Pass' : 'Fail'} · {RULE_LABELS[x.rule] ?? x.rule}
                                   </StatusBadge>
                                 </div>
-                                <p className="text-[13px] leading-relaxed text-graphite sm:col-span-5">{x.message}</p>
+                                <p className="text-[14px] leading-relaxed text-graphite sm:col-span-5">{x.message}</p>
                                 <dl className="grid grid-cols-2 gap-3 text-xs sm:col-span-4">
                                   <div>
                                     <dt className="t-label">Expected</dt>

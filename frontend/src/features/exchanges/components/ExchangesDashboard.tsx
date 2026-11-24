@@ -260,7 +260,7 @@ export function ExchangesDashboard() {
         actions={
           <>
             {identity.locked ? (
-              <span className="inline-flex h-8 min-w-0 items-center gap-1.5 text-[13px] text-slate-600">
+              <span className="inline-flex h-8 min-w-0 items-center gap-1.5 text-[14px] text-slate-600">
                 <Building2 className="size-4 text-slate-500" aria-hidden />
                 <span className="sr-only">Signed in as</span>
                 <span className="truncate font-medium text-graphite">
@@ -523,7 +523,7 @@ function Stepper({ ex }: { ex: ExchangeView }) {
               </div>
               <p
                 className={cn(
-                  'mt-2 text-[11px] font-medium leading-snug',
+                  'mt-2 text-xs font-medium leading-snug',
                   reached ? 'text-graphite' : isCurrent ? 'text-copper-700' : 'text-slate-600'
                 )}
               >
@@ -537,7 +537,7 @@ function Stepper({ ex }: { ex: ExchangeView }) {
       {halted && (
         <p
           className={cn(
-            'flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.06em]',
+            'flex items-center gap-1.5 font-mono text-xs uppercase tracking-[0.06em]',
             ex.stage === 'CANCELLED' ? 'text-slate-600' : 'text-brick-700'
           )}
         >
@@ -639,7 +639,7 @@ function ExchangeRecord({ ex, actingAs, highlighted, busy, onAct, onConfirm, onP
             <StatusBadge tone={stage.tone}>{stage.label}</StatusBadge>
             {role && <Tag className="border-graphite/30 text-graphite">You: {role}</Tag>}
             {paid && (
-              <StatusBadge tone="success" solid>
+              <StatusBadge tone="success">
                 <CreditCard className="size-3" aria-hidden /> Paid{ex.payment?.card_type ? ` · ${ex.payment.card_type}` : ''}
               </StatusBadge>
             )}
@@ -862,7 +862,7 @@ function ExchangeRecord({ ex, actingAs, highlighted, busy, onAct, onConfirm, onP
       <details className="group border-t rule">
         <summary className="flex cursor-pointer list-none items-center gap-1.5 px-5 py-3 text-xs font-medium text-slate-700 hover:text-graphite focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-copper sm:px-6 [&::-webkit-details-marker]:hidden">
           <ChevronDown className="size-3.5 transition-transform duration-base ease-out group-open:rotate-180" aria-hidden />
-          Activity log <span className="font-mono text-[11px] text-slate-500">{ex.activity.length}</span>
+          Activity log <span className="font-mono text-xs text-slate-500">{ex.activity.length}</span>
         </summary>
         <ol className="space-y-2 px-5 pb-4 sm:px-6">
           {ex.activity.map((log) => {

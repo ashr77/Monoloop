@@ -83,7 +83,9 @@ export default function AdminPage() {
       />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <Segmented value={tab} onChange={setTab} options={TAB_OPTIONS} label="Filter applications by status" variant="tabs" />
+        <div className="-mx-4 overflow-x-auto px-4 scrollbar-none sm:mx-0 sm:px-0">
+          <Segmented value={tab} onChange={setTab} options={TAB_OPTIONS} label="Filter applications by status" variant="tabs" />
+        </div>
         {query.isSuccess && (
           <p className="font-mono text-xs text-slate-600">
             {rows.length} {rows.length === 1 ? 'application' : 'applications'}
@@ -126,12 +128,12 @@ export default function AdminPage() {
                           {o.city}
                           {o.address ? ` · ${o.address}` : ''}
                         </div>
-                        <div className="mt-1 font-mono text-[11px] text-slate-600">Applied {new Date(o.created_at).toLocaleString()}</div>
+                        <div className="mt-1 font-mono text-xs text-slate-600">Applied {new Date(o.created_at).toLocaleString()}</div>
                       </td>
-                      <td className="px-4 py-4 font-mono text-[13px] text-graphite">{o.license_number}</td>
+                      <td className="px-4 py-4 font-mono text-[14px] text-graphite">{o.license_number}</td>
                       <td className="px-4 py-4 text-slate-700">{o.contact_email}</td>
                       <td className="px-4 py-4">
-                        <StatusBadge tone={STATUS_TONE[o.status]} solid>
+                        <StatusBadge tone={STATUS_TONE[o.status]}>
                           {o.status.charAt(0) + o.status.slice(1).toLowerCase()}
                         </StatusBadge>
                         {o.rejection_reason && <div className="mt-1.5 max-w-xs text-xs text-slate-600">“{o.rejection_reason}”</div>}

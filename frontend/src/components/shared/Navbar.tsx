@@ -174,7 +174,7 @@ function NavbarInner() {
         <div className="ml-auto flex items-center gap-1.5">
           {mode === 'demo' && (
             <span className="hidden xl:inline-flex" title="No login: use the “Acting as” switchers on each page">
-              <StatusBadge tone="warning" solid>
+              <StatusBadge tone="warning">
                 Synthetic demo
               </StatusBadge>
             </span>
@@ -186,7 +186,7 @@ function NavbarInner() {
             <Link
               href="/messages"
               className={cn(
-                'relative inline-flex h-9 items-center gap-2 rounded-sm px-2.5 text-[13px] font-medium transition-colors duration-fast',
+                'relative inline-flex h-9 items-center gap-2 rounded-sm px-2.5 text-[14px] font-medium transition-colors duration-fast',
                 pathname.startsWith('/messages') ? 'text-graphite' : 'text-slate-600 hover:bg-graphite/[0.05] hover:text-graphite'
               )}
               aria-current={pathname.startsWith('/messages') ? 'page' : undefined}
@@ -200,10 +200,10 @@ function NavbarInner() {
 
           {mode === 'jwt' && !signedIn && (
             <div className="hidden items-center gap-1.5 sm:flex">
-              <Link href="/login" className="inline-flex h-9 items-center rounded-sm px-3 text-[13px] font-medium text-graphite hover:bg-graphite/[0.05]">
+              <Link href="/login" className="inline-flex h-9 items-center rounded-sm px-3 text-[14px] font-medium text-graphite hover:bg-graphite/[0.05]">
                 Sign in
               </Link>
-              <Link href="/signup" className="inline-flex h-9 items-center rounded-sm bg-copper-600 px-3.5 text-[13px] font-medium text-white hover:bg-copper-700">
+              <Link href="/signup" className="inline-flex h-9 items-center rounded-sm bg-copper-600 px-3.5 text-[14px] font-medium text-white hover:bg-copper-700">
                 Register
               </Link>
             </div>
@@ -221,12 +221,12 @@ function NavbarInner() {
                     <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-graphite text-cream">
                       {isAdmin ? <ShieldCheck className="size-3.5" aria-hidden /> : <Building2 className="size-3.5" aria-hidden />}
                     </span>
-                    <span className="truncate text-[13px]">{isAdmin ? 'Administrator' : profile?.organization?.name}</span>
+                    <span className="truncate text-[14px]">{isAdmin ? 'Administrator' : profile?.organization?.name}</span>
                   </span>
                 }
               >
                 <MenuLabel>Signed in as</MenuLabel>
-                <p className="truncate px-2.5 pb-2 text-[13px] text-graphite">{profile?.email}</p>
+                <p className="truncate px-2.5 pb-2 text-[14px] text-graphite">{profile?.email}</p>
                 <MenuSeparator />
                 <MenuItem icon={<UserRound className="size-4" />} onSelect={() => router.push('/account')}>
                   My account
@@ -294,7 +294,7 @@ function NavbarInner() {
               </div>
             )
           ) : mode === 'demo' ? (
-            <StatusBadge tone="warning" solid>
+            <StatusBadge tone="warning">
               Synthetic demo mode · use the “Acting as” switchers
             </StatusBadge>
           ) : null
@@ -312,7 +312,7 @@ function NavLink({ href, active, children }: { href: string; active: boolean; ch
       href={href}
       aria-current={active ? 'page' : undefined}
       className={cn(
-        'relative inline-flex h-9 items-center rounded-sm px-3 text-[13px] font-medium transition-colors duration-fast',
+        'relative inline-flex h-9 items-center rounded-sm px-3 text-[14px] font-medium transition-colors duration-fast',
         active ? 'text-graphite' : 'text-slate-600 hover:bg-graphite/[0.05] hover:text-graphite'
       )}
     >
@@ -389,7 +389,7 @@ function TradeMenu({ pathname, scope, active, canCreate }: { pathname: string; s
         aria-controls="trade-menu"
         onClick={() => setOpen((v) => !v)}
         className={cn(
-          'relative inline-flex h-9 items-center gap-1 rounded-sm px-3 text-[13px] font-medium transition-colors duration-fast',
+          'relative inline-flex h-9 items-center gap-1 rounded-sm px-3 text-[14px] font-medium transition-colors duration-fast',
           active || open ? 'text-graphite' : 'text-slate-600 hover:bg-graphite/[0.05] hover:text-graphite'
         )}
       >
@@ -432,7 +432,7 @@ function TradeMenu({ pathname, scope, active, canCreate }: { pathname: string; s
                             {e.label}
                             <ArrowUpRight className="size-3.5 -translate-x-1 opacity-0 transition-all duration-base group-hover:translate-x-0 group-hover:opacity-100" aria-hidden />
                           </span>
-                          <span className="block text-[13px] text-slate-600">{e.description}</span>
+                          <span className="block text-[14px] text-slate-600">{e.description}</span>
                         </span>
                       </Link>
                     </li>
@@ -456,7 +456,7 @@ function TradeMenu({ pathname, scope, active, canCreate }: { pathname: string; s
                       </li>
                     </ul>
                   ) : (
-                    <p className="text-[13px] text-slate-600">Administrators can browse the market but not trade.</p>
+                    <p className="text-[14px] text-slate-600">Administrators can browse the market but not trade.</p>
                   )}
                 </div>
               </div>

@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth/AuthProvider';
 import { Wordmark } from './Wordmark';
 
@@ -34,6 +35,9 @@ const COLUMNS: { title: string; links: { href: string; label: string }[] }[] = [
 export function SiteFooter() {
   const { mode, profile } = useAuth();
   // With login on, Impact (resource recovery) is for admins only.
+  const pathname = usePathname() || '/';
+  // Sign-in, registration and the pending screen stay focused: no site links.
+  if (['/login', '/signup', '/pending'].some((p) => pathname.startsWith(p))) return null;
   const hideImpact = mode === 'jwt' && profile?.role !== 'admin';
   const columns = COLUMNS.map((c) => ({ ...c, links: c.links.filter((l) => !(hideImpact && l.href === '/impact')) }));
   return (
