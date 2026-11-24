@@ -72,6 +72,13 @@ class Settings(BaseSettings):
     ai_transcribe_endpoint: str = ""
     max_audio_bytes: int = Field(default=1_500_000, ge=10_000, le=15_000_000)
 
+    # --- Listing photos ---------------------------------------------------------
+    # Supabase Storage bucket (public, created on first upload) when SUPABASE_URL and the
+    # service-role key are set; otherwise files go to UPLOAD_DIR and are served at /uploads.
+    storage_bucket: str = Field(default="listing-images", pattern=r"^[a-z0-9][a-z0-9_-]{1,62}$")
+    max_image_bytes: int = Field(default=5_000_000, ge=10_000, le=20_000_000)
+    upload_dir: str = "uploads"
+
     @field_validator("supabase_url", "supabase_service_role_key", "ai_api_key", "sslcommerz_store_id",
                      "sslcommerz_store_password", "database_url", "public_api_url", "frontend_url", mode="before")
     @classmethod
@@ -144,6 +151,11 @@ class Settings(BaseSettings):
     def max_transcribe_body_bytes(self) -> int:
         """Base64 adds a third, plus room for the JSON wrapper."""
         return self.max_audio_bytes * 4 // 3 + 4096
+
+    @property
+    def max_image_body_bytes(self) -> int:
+        """Base64 adds a third, plus room for the JSON wrapper."""
+        return self.max_image_bytes * 4 // 3 + 4096
 
     @property
     def ai_configured(self) -> bool:

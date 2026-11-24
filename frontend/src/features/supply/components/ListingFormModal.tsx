@@ -17,6 +17,7 @@ import {
 import { MaterialExtractionResult } from '@/lib/ai/schemas';
 import { useExtractMaterial, useSaveListing } from '@/hooks';
 import { errorMessage } from '@/lib/api/client';
+import { ListingImageField } from './ListingImageField';
 import { VoiceInputControl } from './VoiceInputControl';
 import { useIdentity } from '@/lib/auth/AuthProvider';
 
@@ -74,6 +75,7 @@ export function ListingFormModal({
   const [city, setCity] = useState<string>(initialData?.city || 'Gazipur');
   const [description, setDescription] = useState<string>(initialData?.description || '');
   const [imageUrl, setImageUrl] = useState<string>(initialData?.image_url || '');
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
 
   // AI Extraction State
   const [aiPrompt, setAiPrompt] = useState('');
@@ -212,6 +214,7 @@ export function ListingFormModal({
   // Submit Handler
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isUploadingImage) return;
     setFormErrors({});
     setGeneralError(null);
 
@@ -302,8 +305,8 @@ export function ListingFormModal({
           <Button variant="secondary" onClick={onClose} disabled={isSubmitting}>
             Cancel
           </Button>
-          <Button type="submit" form={formId} busy={isSubmitting}>
-            {isSubmitting ? 'Saving Listing...' : isEditing ? 'Save Changes' : 'Publish Listing'}
+          <Button type="submit" form={formId} busy={isSubmitting} disabled={isUploadingImage}>
+            {isSubmitting ? 'Saving Listing...' : isUploadingImage ? 'Uploading photo…' : isEditing ? 'Save Changes' : 'Publish Listing'}
           </Button>
         </>
       }
@@ -582,22 +585,22 @@ export function ListingFormModal({
               />
             </Field>
 
-            <Field
-              id={fieldId('image')}
-              label="Photo URL"
-              optional
-              hint="Optional human inspection reference. Photographs support visual check only; technical specifications are certified by numeric fields above."
-              className="col-span-12"
-            >
-              <input
-                {...controlProps(fieldId('image'), undefined, true)}
-                type="url"
-                placeholder="https://example.com/images/metal-sheet.jpg"
+            <div className="col-span-12 min-w-0">
+              <p className="field-label">
+                Photo <span className="ml-1 font-normal text-slate-600">Optional</span>
+              </p>
+              <ListingImageField
+                id={fieldId('image')}
                 value={imageUrl}
-                onChange={(e) => setImageUrl(e.target.value)}
-                className="field"
+                onChange={setImageUrl}
+                organizationId={organizationId}
+                onBusyChange={setIsUploadingImage}
               />
-            </Field>
+              <p id={`${fieldId('image')}-hint`} className="field-hint mt-2">
+                Optional human inspection reference. Photographs support visual check only; technical specifications are
+                certified by numeric fields above.
+              </p>
+            </div>
           </FormSection>
 
           {/* Save failure: next to the actions so it is seen after submitting */}

@@ -7,12 +7,14 @@ from typing import Annotated
 from fastapi import APIRouter, Path, Query, Request, status
 
 from app.api.deps import ContainerDep
+from app.core.errors import AppError
 from app.core.security import require_actor
 from app.domain.constants import ListingStatus, MaterialFamily
 from app.repositories.base import ListingFilter
 from app.schemas.common import ApiResponse, ok
 from app.schemas.entities import Listing, Organization
-from app.schemas.inputs import ListingCreate, ListingUpdate
+from app.schemas.inputs import ImageUploadRequest, ListingCreate, ListingUpdate
+from app.services.storage import UploadedImage
 
 router = APIRouter(prefix="/api", tags=["supply"])
 IdPath = Annotated[str, Path(max_length=64)]
@@ -56,3 +58,12 @@ async def update_listing(listing_id: IdPath, body: ListingUpdate, request: Reque
     """Edit or archive a listing. Only the owner may change it; reserved stock is never editable."""
     actor = await require_actor(request, c.settings, body.caller_organization_id)
     return ok(await c.listings.update(listing_id, body, actor))
+
+
+@router.post("/uploads/listing-image", status_code=status.HTTP_201_CREATED, response_model=ApiResponse[UploadedImage])
+async def upload_listing_image(body: ImageUploadRequest, request: Request, c: ContainerDep):
+    """Store a listing photo (JPEG, PNG or WebP, base64) and return its public URL for `image_url`."""
+    actor = await require_actor(request, c.settings)
+    if await c.repos.organizations.get(actor) is None:
+        raise AppError("NOT_FOUND", "Acting organization was not found.")
+    return ok(await c.images.upload_listing_image(body.image_base64, body.mime_type, actor))
