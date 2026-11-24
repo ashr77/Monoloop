@@ -102,7 +102,7 @@ export default function SignupPage() {
             value={form.license_number}
             onChange={set('license_number')}
             error={errors.license_number}
-            hint="Checked by the MONOLOOP admin."
+            hint="Checked by the Meguri admin."
           />
         </div>
         <Field label="Address (optional)" value={form.address} onChange={set('address')} />

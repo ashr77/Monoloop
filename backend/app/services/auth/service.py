@@ -30,7 +30,7 @@ from app.services.auth.provider import AuthProvider, Identity
 _STATUS_MESSAGE = {
     "PENDING": "Your company is waiting for admin approval.",
     "REJECTED": "Your application was rejected. Update it and submit again.",
-    "SUSPENDED": "Your company account is suspended. Contact the MONOLOOP admin.",
+    "SUSPENDED": "Your company account is suspended. Contact the Meguri admin.",
 }
 
 

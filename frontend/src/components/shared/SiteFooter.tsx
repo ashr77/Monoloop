@@ -65,7 +65,7 @@ export function SiteFooter() {
       </div>
       <div className="border-t border-graphite/10">
         <div className="page-shell flex flex-col gap-2 py-5 text-xs text-slate-600 sm:flex-row sm:items-center sm:justify-between">
-          <p>MONOLOOP &copy; 2026</p>
+          <p>MEGURI &copy; 2026</p>
           <p>All registered organizations and listings shown are synthetic demo data.</p>
         </div>
       </div>

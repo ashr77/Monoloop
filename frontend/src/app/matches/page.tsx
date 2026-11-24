@@ -2,7 +2,7 @@
 import { MatchesOverview } from '@/features/matching/components/MatchesOverview';
 
 export const metadata = {
-  title: 'Matches | MONOLOOP',
+  title: 'Matches | Meguri',
   description: 'Live compatibility and allocation status for every open buyer requirement.',
 };
 

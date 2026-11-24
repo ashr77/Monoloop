@@ -122,7 +122,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     const timedOut = error instanceof DOMException && error.name === 'TimeoutError';
     throw new ApiError(
       timedOut ? 'TIMEOUT' : 'NETWORK_ERROR',
-      timedOut ? 'The server took too long to respond.' : 'Cannot reach the MONOLOOP API. Is the backend running?',
+      timedOut ? 'The server took too long to respond.' : 'Cannot reach the Meguri API. Is the backend running?',
       0
     );
   }

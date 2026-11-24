@@ -1,7 +1,7 @@
 import { ImpactView } from '@/features/analytics/components/ImpactView';
 
 export const metadata = {
-  title: 'Impact | MONOLOOP',
+  title: 'Impact | Meguri',
   description: 'Resource recovery from completed industrial surplus exchanges.',
 };
 

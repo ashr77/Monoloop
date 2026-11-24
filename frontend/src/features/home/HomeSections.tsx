@@ -43,7 +43,7 @@ export function Hero() {
             transition={{ delay: 0.45, duration: 0.7, ease: EASE_OUT }}
           >
             <p className="mt-7 max-w-[34rem] text-[17px] leading-relaxed text-slate-700">
-              MONOLOOP connects manufacturers holding surplus sheets, offcuts and leftover stock with the businesses that need exactly
+              Meguri connects manufacturers holding surplus sheets, offcuts and leftover stock with the businesses that need exactly
               those specifications &mdash; checked rule by rule, allocated across suppliers, and exchanged against reserved stock.
             </p>
             <div className="mt-9 flex flex-wrap items-center gap-3">
@@ -176,7 +176,7 @@ export function ConnectionStory() {
           <Reveal delay={0.2}>
             <p className="max-w-xl text-[17px] leading-relaxed text-cream/75">
               A name-only search can&rsquo;t tell a usable 1.2&nbsp;mm SS304 sheet from an unusable one, or count stock that is
-              already promised to someone else. MONOLOOP connects supply and demand on specification &mdash; and shows its working,
+              already promised to someone else. Meguri connects supply and demand on specification &mdash; and shows its working,
               so both sides can trust the connection.
             </p>
           </Reveal>

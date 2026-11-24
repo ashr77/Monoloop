@@ -305,7 +305,7 @@ function BaselineCallout({ requirement, result }: Props) {
         </p>
         <p className="text-slate-700">
           A conventional listing search matches &ldquo;{SPEC_LABEL[requirement.material_specification] ?? requirement.material_specification}&rdquo; by name and would report{' '}
-          {num(b.claimed_quantity)} pieces in stock. MONOLOOP checks size, thickness, condition and reservations, and finds{' '}
+          {num(b.claimed_quantity)} pieces in stock. Meguri checks size, thickness, condition and reservations, and finds{' '}
           {num(result.evaluations.filter((e) => e.compatible).reduce((s, e) => s + e.available_quantity, 0))} usable pieces.
         </p>
       </div>

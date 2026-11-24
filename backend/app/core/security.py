@@ -53,7 +53,7 @@ async def require_admin(request: Request) -> None:
     auth = _auth(request)
     identity = await auth.identity(request)
     if identity.role != "admin":
-        raise AppError("ADMIN_ONLY", "Only MONOLOOP admins can do this.")
+        raise AppError("ADMIN_ONLY", "Only Meguri admins can do this.")
 
 
 async def is_admin(request: Request, settings: Settings) -> bool:

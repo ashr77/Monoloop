@@ -30,7 +30,7 @@ export function LivePulse() {
           Live on the network
         </p>
         {allFailed ? (
-          <p className="text-sm text-slate-600">Live figures are unavailable right now — the MONOLOOP API could not be reached.</p>
+          <p className="text-sm text-slate-600">Live figures are unavailable right now — the Meguri API could not be reached.</p>
         ) : (
           <dl className="grid flex-1 grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4">
             {items.map((it) => (

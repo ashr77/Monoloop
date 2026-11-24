@@ -17,7 +17,7 @@ export function Wordmark({ className, inverse = false }: { className?: string; i
   return (
     <span className={cn('inline-flex items-center gap-2.5', className)}>
       <LoopMark inverse={inverse} />
-      <span className={cn('text-[15px] font-semibold tracking-[0.14em]', inverse ? 'text-cream' : 'text-graphite')}>MONOLOOP</span>
+      <span className={cn('text-[15px] font-semibold tracking-[0.14em]', inverse ? 'text-cream' : 'text-graphite')}>MEGURI</span>
     </span>
   );
 }

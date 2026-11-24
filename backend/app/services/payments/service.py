@@ -105,7 +105,7 @@ class PaymentService:
                 tran_id=tran_id,
                 amount_bdt=amount,
                 product_name=product,
-                customer_name=buyer.name if buyer else "MONOLOOP buyer",
+                customer_name=buyer.name if buyer else "Meguri buyer",
                 # Demo organizations have no contact details; a real deployment takes these from the account.
                 customer_email=f"buyer-{actor_id[:8]}@monoloop.example",
                 customer_phone="01700000000",

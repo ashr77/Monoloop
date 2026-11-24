@@ -1,7 +1,7 @@
 import { InboxView } from '@/features/chat/components/InboxView';
 
 export const metadata = {
-  title: 'Messages | MONOLOOP',
+  title: 'Messages | Meguri',
   description: 'Chats between buyers and suppliers about surplus listings.',
 };
 

@@ -155,7 +155,7 @@ function NavbarInner() {
       )}
     >
       <div className="page-shell flex h-16 items-center gap-6">
-        <Link href="/" className="shrink-0 rounded-sm" aria-label="MONOLOOP home">
+        <Link href="/" className="shrink-0 rounded-sm" aria-label="Meguri home">
           <Wordmark />
         </Link>
 

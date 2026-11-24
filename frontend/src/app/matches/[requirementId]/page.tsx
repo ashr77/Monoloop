@@ -1,7 +1,7 @@
 import { MatchDetail } from '@/features/matching/components/MatchDetail';
 
 export const metadata = {
-  title: 'Matches | MONOLOOP',
+  title: 'Matches | Meguri',
   description: 'Explainable compatibility matching and multi-supplier allocation for a buyer requirement.',
 };
 
