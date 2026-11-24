@@ -39,7 +39,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -72,22 +72,18 @@ jobs:
         if: steps.changes.outputs.backend == 'true'
         env:
           HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_API }}
-        run: |
-          if [ -z "$HOOK" ]; then echo "::warning::RENDER_DEPLOY_HOOK_API secret is not set; backend not deployed."; exit 0; fi
-          code=$(curl -s -o /dev/null -w '%{http_code}' -X POST "${HOOK}&ref=${GITHUB_SHA}")
-          echo "Render answered HTTP $code"
-          case "$code" in 200|202) echo "triggered=true" >> "$GITHUB_OUTPUT" ;; *) exit 1 ;; esac
+          NAME: RENDER_DEPLOY_HOOK_API
+          WHAT: backend
+        run: bash .github/scripts/render-deploy-hook.sh
 
       - name: Deploy frontend (monoloop-web)
         id: web
         if: steps.changes.outputs.frontend == 'true'
         env:
           HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_WEB }}
-        run: |
-          if [ -z "$HOOK" ]; then echo "::warning::RENDER_DEPLOY_HOOK_WEB secret is not set; frontend not deployed."; exit 0; fi
-          code=$(curl -s -o /dev/null -w '%{http_code}' -X POST "${HOOK}&ref=${GITHUB_SHA}")
-          echo "Render answered HTTP $code"
-          case "$code" in 200|202) echo "triggered=true" >> "$GITHUB_OUTPUT" ;; *) exit 1 ;; esac
+          NAME: RENDER_DEPLOY_HOOK_WEB
+          WHAT: frontend
+        run: bash .github/scripts/render-deploy-hook.sh
 
       - name: Wait until the backend runs this commit
         if: steps.api.outputs.triggered == 'true'
