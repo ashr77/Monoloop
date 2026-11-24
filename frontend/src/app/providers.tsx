@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MotionConfig } from 'framer-motion';
 import type { ReactNode } from 'react';
 import { AuthProvider } from '@/lib/auth/AuthProvider';
+import { I18nProvider } from '@/lib/i18n/I18nProvider';
 
 function makeQueryClient() {
   return new QueryClient({
@@ -34,7 +35,9 @@ export function Providers({ children }: { children: ReactNode }) {
     <QueryClientProvider client={getQueryClient()}>
       {/* Every framer-motion animation honours the OS "reduce motion" setting. */}
       <MotionConfig reducedMotion="user">
-        <AuthProvider>{children}</AuthProvider>
+        <I18nProvider>
+          <AuthProvider>{children}</AuthProvider>
+        </I18nProvider>
       </MotionConfig>
     </QueryClientProvider>
   );

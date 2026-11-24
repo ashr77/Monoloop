@@ -12,20 +12,22 @@
 import { motion, useInView, useReducedMotion } from 'framer-motion';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { EASE_IN_OUT, EASE_OUT } from '@/components/motion';
+import { useT } from '@/lib/i18n/I18nProvider';
 
 type Pt = { x: number; y: number };
+type SpecKey = 's1' | 's2' | 's3' | 'b1' | 'b2';
 
 const HUB: Pt = { x: 300, y: 250 };
-const SUPPLIERS: (Pt & { id: string; role: string; spec: string })[] = [
-  { id: 's1', x: 86, y: 92, role: 'SUPPLIER', spec: 'SS304 offcut · 1.2 mm' },
-  { id: 's2', x: 64, y: 250, role: 'SUPPLIER', spec: 'Marine ply · 18 mm' },
-  { id: 's3', x: 92, y: 408, role: 'SUPPLIER', spec: 'Marine ply · leftover' },
+const SUPPLIERS: (Pt & { id: string; role: 'supplier'; spec: SpecKey })[] = [
+  { id: 's1', x: 86, y: 92, role: 'supplier', spec: 's1' },
+  { id: 's2', x: 64, y: 250, role: 'supplier', spec: 's2' },
+  { id: 's3', x: 92, y: 408, role: 'supplier', spec: 's3' },
 ];
-const BUYERS: (Pt & { id: string; role: string; spec: string })[] = [
-  { id: 'b1', x: 516, y: 140, role: 'BUYER', spec: 'Needs SS304 ≥ 1000 mm' },
-  { id: 'b2', x: 524, y: 362, role: 'BUYER', spec: 'Needs 18 mm plywood' },
+const BUYERS: (Pt & { id: string; role: 'buyer'; spec: SpecKey })[] = [
+  { id: 'b1', x: 516, y: 140, role: 'buyer', spec: 'b1' },
+  { id: 'b2', x: 524, y: 362, role: 'buyer', spec: 'b2' },
 ];
-const RULES = ['Grade', 'Size', 'Thickness', 'Stock'];
+const RULE_COUNT = 4;
 
 const curve = (a: Pt, b: Pt) => {
   const dx = (b.x - a.x) * 0.55;
@@ -36,8 +38,8 @@ const IN_PATHS = Object.fromEntries(SUPPLIERS.map((s) => [s.id, curve(s, HUB)]))
 const OUT_PATHS = Object.fromEntries(BUYERS.map((b) => [b.id, curve(HUB, b)]));
 
 const SCENARIOS = [
-  { suppliers: ['s1'], buyer: 'b1', caption: 'Single supplier · every rule passes' },
-  { suppliers: ['s2', 's3'], buyer: 'b2', caption: 'Two suppliers combined to fill one requirement' },
+  { suppliers: ['s1'], buyer: 'b1' },
+  { suppliers: ['s2', 's3'], buyer: 'b2' },
 ];
 
 // Phase timeline per scenario (ms from scenario start).
@@ -77,6 +79,7 @@ function Packet({ d, duration, delay = 0 }: { d: string; duration: number; delay
 }
 
 export function HeroNetwork() {
+  const hn = useT().hero;
   const reduce = useReducedMotion();
   const ref = useRef<HTMLDivElement>(null);
   const inView = useInView(ref, { margin: '-10% 0px' });
@@ -116,7 +119,7 @@ export function HeroNetwork() {
         aria-labelledby="hero-network-title"
       >
         <title id="hero-network-title">
-          Illustration: surplus from suppliers is checked by Meguri against each buyer requirement before the two are connected.
+          {hn.title}
         </title>
 
         {/* Engineering grid */}
@@ -180,13 +183,13 @@ export function HeroNetwork() {
             MEGURI
           </text>
           <text y={30} textAnchor="middle" fontSize={9.5} letterSpacing="0.08em" fill="#E5D5BD" className="font-mono">
-            {phase === 1 ? 'CHECKING RULES' : connected ? 'COMPATIBLE' : 'MATCHING'}
+            {phase === 1 ? hn.checking : connected ? hn.compatible : hn.matching}
           </text>
         </g>
 
         {/* Rule checks under the hub */}
         <g transform={`translate(${HUB.x - 135} ${HUB.y + 66})`} className="font-mono">
-          {RULES.map((r, i) => {
+          {hn.rules.slice(0, RULE_COUNT).map((r, i) => {
             const on = phase >= 1;
             return (
               <motion.g
@@ -230,10 +233,10 @@ export function HeroNetwork() {
               />
               <rect x={-5} y={-5} width={10} height={10} rx={1} fill={active ? '#C66B3D' : '#657580'} />
               <text x={-18} y={-30} fontSize={9} letterSpacing="0.1em" fill="#56646E" className="font-mono">
-                {s.role}
+                {hn[s.role]}
               </text>
               <text x={-18} y={38} fontSize={11.5} fill="#20252A" fontWeight={active ? 600 : 400}>
-                {s.spec}
+                {hn.specs[s.spec]}
               </text>
             </g>
           );
@@ -264,10 +267,10 @@ export function HeroNetwork() {
               />
               <circle r={5} fill={done ? '#F8F5ED' : '#657580'} />
               <text x={18} y={-30} fontSize={9} letterSpacing="0.1em" fill="#56646E" textAnchor="end" className="font-mono">
-                {b.role}
+                {hn[b.role]}
               </text>
               <text x={18} y={38} fontSize={11.5} fill="#20252A" textAnchor="end" fontWeight={isTarget ? 600 : 400}>
-                {b.spec}
+                {hn.specs[b.spec]}
               </text>
             </g>
           );
@@ -282,7 +285,7 @@ export function HeroNetwork() {
           transition={{ duration: 0.4, ease: EASE_OUT }}
           className="font-mono text-xs uppercase tracking-[0.08em] text-slate-600"
         >
-          {sc.caption}
+          {hn.captions[scenario]}
         </motion.p>
         <div className="flex gap-1.5" aria-hidden>
           {SCENARIOS.map((_, i) => (

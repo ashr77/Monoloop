@@ -6,12 +6,14 @@ import Link from 'next/link';
 import { EASE_OUT, Reveal, RevealText } from '@/components/motion';
 import { LinkButton } from '@/components/ui';
 import { useAuth } from '@/lib/auth/AuthProvider';
+import { useT } from '@/lib/i18n/I18nProvider';
 import { HeroNetwork } from './HeroNetwork';
 
 /* ------------------------------------------------------------------- hero */
 
 export function Hero() {
   const { profile } = useAuth();
+  const h = useT().home;
   const isAdmin = profile?.role === 'admin';
   return (
     <section className="relative overflow-hidden">
@@ -19,14 +21,15 @@ export function Hero() {
       <div className="page-shell relative grid items-center gap-12 pb-14 pt-14 sm:pt-20 lg:grid-cols-12 lg:gap-8 lg:pb-20 lg:pt-24">
         <div className="lg:col-span-6">
           <RevealText
+            key={h.heroLines.join('')}
             as="h1"
             className="mt-6 text-[clamp(2.75rem,5.2vw,4.75rem)] font-medium leading-[0.98] tracking-[-0.045em] text-graphite"
             delay={0.1}
           >
-            <>One Industry&rsquo;s</>
-            <>Surplus.</>
-            <>Another&rsquo;s</>
-            <span className="text-copper-600">Opportunity.</span>
+            <>{h.heroLines[0]}</>
+            <>{h.heroLines[1]}</>
+            <>{h.heroLines[2]}</>
+            <span className="text-copper-600">{h.heroLines[3]}</span>
           </RevealText>
           <motion.div
             initial={{ opacity: 0, y: 12 }}
@@ -35,11 +38,11 @@ export function Hero() {
           >
             <div className="mt-10 flex flex-wrap items-center gap-3">
               <LinkButton href="/supply?scope=all" size="lg" trailing={<ArrowRight className="size-4 transition-transform duration-base group-hover/btn:translate-x-0.5" />}>
-                Explore Marketplace
+                {h.exploreMarketplace}
               </LinkButton>
               {!isAdmin && (
                 <LinkButton href="/supply?compose=1" size="lg" variant="secondary">
-                  List Surplus
+                  {h.listSurplus}
                 </LinkButton>
               )}
             </div>
@@ -60,28 +63,16 @@ export function Hero() {
 
 /* ----------------------------------------------------------- how it works */
 
-const STAGES = [
-  {
-    n: '01',
-    title: 'List or source materials',
-  },
-  {
-    n: '02',
-    title: 'Find compatible matches',
-  },
-  {
-    n: '03',
-    title: 'Coordinate the exchange',
-  },
-];
+const STAGE_NUMBERS = ['01', '02', '03'];
 
 export function HowItWorks() {
+  const h = useT().home;
   return (
     <section aria-labelledby="how-heading" className="bg-sand-50">
       <div className="page-shell py-20 lg:py-28">
         <Reveal className="grid gap-6 lg:grid-cols-12">
           <h2 id="how-heading" className="text-display-md font-medium lg:col-span-12">
-            Three steps from a factory&rsquo;s offcut rack to another&rsquo;s production line.
+            {h.stepsHeading}
           </h2>
         </Reveal>
 
@@ -97,9 +88,9 @@ export function HowItWorks() {
           />
           <div className="absolute bottom-0 left-[11px] top-0 w-px bg-copper/40 lg:hidden" aria-hidden />
           <ol className="grid gap-12 lg:grid-cols-3 lg:gap-10">
-            {STAGES.map((s, i) => (
+            {STAGE_NUMBERS.map((n, i) => (
               <motion.li
-                key={s.n}
+                key={n}
                 className="relative pl-10 lg:pl-0 lg:pt-12"
                 initial={{ opacity: 0, y: 16 }}
                 whileInView={{ opacity: 1, y: 0 }}
@@ -109,8 +100,8 @@ export function HowItWorks() {
                 <span className="absolute left-0 top-0 flex size-[23px] items-center justify-center rounded-full border border-copper bg-sand-50" aria-hidden>
                   <span className="size-2 rounded-full bg-copper" />
                 </span>
-                <p className="font-mono text-sm text-copper-700">{s.n}</p>
-                <h3 className="mt-2 text-heading-md font-medium">{s.title}</h3>
+                <p className="font-mono text-sm text-copper-700">{n}</p>
+                <h3 className="mt-2 text-heading-md font-medium">{h.steps[i]}</h3>
               </motion.li>
             ))}
           </ol>
@@ -123,6 +114,7 @@ export function HowItWorks() {
 /* -------------------------------------------------------- connection story */
 
 export function ConnectionStory() {
+  const h = useT().home;
   return (
     <section aria-labelledby="tsunagu-heading" className="relative overflow-hidden bg-graphite text-cream">
       {/* Subtle, slow background movement (stops under reduced motion) */}
@@ -135,27 +127,25 @@ export function ConnectionStory() {
           <p lang="ja" className="mt-6 text-[clamp(5rem,12vw,10rem)] font-medium leading-none tracking-[-0.04em] text-transparent [-webkit-text-stroke:1.5px_#C66B3D]" aria-hidden>
             繋ぐ
           </p>
-          <p className="mt-6 text-sm text-sand/80">to connect · to join · to carry across</p>
+          <p className="mt-6 text-sm text-sand/80">{h.tsunaguMeaning}</p>
         </Reveal>
 
         <div className="space-y-10 lg:col-span-7">
           <Reveal delay={0.1}>
             <h2 id="tsunagu-heading" className="text-display-md font-medium text-cream">
-              Surplus rarely fails for lack of a buyer. It fails because nobody can tell it fits.
+              {h.storyHeading}
             </h2>
           </Reveal>
           <Reveal delay={0.2}>
             <p className="max-w-xl text-[17px] leading-relaxed text-cream/75">
-              A name-only search can&rsquo;t tell a usable 1.2&nbsp;mm SS304 sheet from an unusable one, or count stock that is
-              already promised to someone else. Meguri connects supply and demand on specification &mdash; and shows its working,
-              so both sides can trust the connection.
+              {h.storyBody}
             </p>
           </Reveal>
 
           <Reveal delay={0.3}>
             <svg viewBox="0 0 640 120" className="h-auto w-full" aria-hidden>
-              <text x="0" y="22" fill="#E5D5BD" fontSize="12" letterSpacing="2" className="font-mono">SURPLUS</text>
-              <text x="640" y="22" fill="#E5D5BD" fontSize="12" letterSpacing="2" textAnchor="end" className="font-mono">DEMAND</text>
+              <text x="0" y="22" fill="#E5D5BD" fontSize="12" letterSpacing="2" className="font-mono">{h.surplus}</text>
+              <text x="640" y="22" fill="#E5D5BD" fontSize="12" letterSpacing="2" textAnchor="end" className="font-mono">{h.demand}</text>
               <path d="M8 70 H632" stroke="#F8F5ED" strokeOpacity="0.15" strokeDasharray="2 6" />
               <motion.path
                 d="M8 70 C 160 70, 200 30, 320 30 S 480 70, 632 70"
@@ -179,7 +169,7 @@ export function ConnectionStory() {
                 transition={{ delay: 2.1, duration: 0.4, ease: EASE_OUT }}
                 style={{ transformOrigin: '632px 70px' }}
               />
-              {['Grade', 'Size', 'Thickness', 'Condition', 'Stock'].map((r, i) => (
+              {h.storyRules.map((r, i) => (
                 <motion.text
                   key={r}
                   x={110 + i * 105}
@@ -194,7 +184,7 @@ export function ConnectionStory() {
                   viewport={{ once: true }}
                   transition={{ delay: 0.8 + i * 0.2, duration: 0.4 }}
                 >
-                  {r.toUpperCase()} ✓
+                  {r} ✓
                 </motion.text>
               ))}
             </svg>
@@ -209,26 +199,26 @@ export function ConnectionStory() {
 
 export function Closing() {
   const { profile } = useAuth();
+  const h = useT().home;
   const isAdmin = profile?.role === 'admin';
   return (
     <section aria-labelledby="closing-heading" className="border-t border-graphite/10">
       <div className="page-shell grid gap-10 py-20 lg:grid-cols-12 lg:items-end lg:py-28">
         <Reveal className="lg:col-span-7">
-          <p className="t-eyebrow">Next step</p>
+          <p className="t-eyebrow">{h.nextStep}</p>
           <h2 id="closing-heading" className="mt-4 text-display-lg font-medium">
-            Put surplus back into production.
+            {h.closingHeading}
           </h2>
         </Reveal>
         <Reveal delay={0.1} className="space-y-6 lg:col-span-5">
           <p className="text-[15px] leading-relaxed text-slate-700">
-            Browse what&rsquo;s available today, list what your floor no longer needs, or describe what your line requires and let
-            matching do the searching.
+            {h.closingBody}
           </p>
           <div className="flex flex-col divide-y divide-graphite/10 border-y border-graphite/10">
             {[
-              { href: '/supply?scope=all', label: 'Explore the marketplace', show: true },
-              { href: '/supply?compose=1', label: 'List surplus material', show: !isAdmin },
-              { href: '/demand?compose=1', label: 'Post a buyer requirement', show: !isAdmin },
+              { href: '/supply?scope=all', label: h.closingMarketplace, show: true },
+              { href: '/supply?compose=1', label: h.closingList, show: !isAdmin },
+              { href: '/demand?compose=1', label: h.closingRequirement, show: !isAdmin },
             ]
               .filter((l) => l.show)
               .map((l) => (
@@ -241,5 +231,22 @@ export function Closing() {
         </Reveal>
       </div>
     </section>
+  );
+}
+
+/* --------------------------------------------------------- product intro */
+
+export function ProductIntro() {
+  const h = useT().home;
+  return (
+    <Reveal className="mb-14 grid gap-6 lg:grid-cols-12">
+      <p className="t-eyebrow lg:col-span-3">{h.productEyebrow}</p>
+      <div className="space-y-4 lg:col-span-9">
+        <h2 id="product-heading" className="text-display-md font-medium">
+          {h.productHeading}
+        </h2>
+        <p className="max-w-2xl text-[15px] leading-relaxed text-slate-700">{h.productBody}</p>
+      </div>
+    </Reveal>
   );
 }

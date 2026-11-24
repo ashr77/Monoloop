@@ -27,6 +27,12 @@
 }
 
 @layer base {
+  /* Japanese: break lines between phrases, not inside words (Chrome 119+; others ignore it). */
+  :lang(ja) {
+    word-break: auto-phrase;
+    line-break: strict;
+  }
+
   html {
     -webkit-text-size-adjust: 100%;
     scroll-padding-top: calc(var(--header-h) + 1rem);

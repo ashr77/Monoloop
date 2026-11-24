@@ -36,6 +36,9 @@ import { Menu, MenuItem, MenuLabel, MenuSeparator, StatusBadge } from '@/compone
 import { UnreadBadge } from '@/features/chat/components/UnreadBadge';
 import { NotificationBell } from '@/features/notifications/NotificationBell';
 import { useAuth } from '@/lib/auth/AuthProvider';
+import type { Messages } from '@/lib/i18n/en';
+import { useT } from '@/lib/i18n/I18nProvider';
+import { LanguageToggle } from './LanguageToggle';
 import { cn } from '@/lib/utils';
 import { Wordmark } from './Wordmark';
 
@@ -50,61 +53,61 @@ interface NavEntry {
   match: (path: string, scope: string | null) => boolean;
 }
 
-const TRADE: NavEntry[] = [
+const trade = (t: Messages['nav']): NavEntry[] => [
   {
     href: '/supply?scope=all',
-    label: 'Marketplace',
-    description: 'Every active surplus listing on the network',
+    label: t.marketplace,
+    description: t.marketplaceDesc,
     icon: Store,
     match: (p, s) => p.startsWith('/supply') && s === 'all',
   },
   {
     href: '/supply',
-    label: 'Supplier inventory',
-    description: 'Your surplus listings, stock and reservations',
+    label: t.inventory,
+    description: t.inventoryDesc,
     icon: Warehouse,
     match: (p, s) => p.startsWith('/supply') && s !== 'all',
   },
   {
     href: '/demand',
-    label: 'Buyer requirements',
-    description: 'Specifications you need, matched against supply',
+    label: t.requirements,
+    description: t.requirementsDesc,
     icon: ClipboardList,
     match: (p) => p.startsWith('/demand'),
   },
 ];
 
-const PRIMARY: NavEntry[] = [
+const primaryEntries = (t: Messages['nav']): NavEntry[] => [
   {
     href: '/matches',
-    label: 'Matching',
-    description: 'Explainable compatibility for open requirements',
+    label: t.matching,
+    description: t.matchingDesc,
     icon: Cpu,
     match: (p) => p.startsWith('/matches'),
   },
   {
     href: '/exchanges',
-    label: 'Exchanges',
-    description: 'Requests, reservations and transfers',
+    label: t.exchanges,
+    description: t.exchangesDesc,
     icon: ArrowLeftRight,
     match: (p) => p.startsWith('/exchanges'),
   },
   {
     href: '/impact',
-    label: 'Impact',
-    description: 'Confirmed reuse and pipeline',
+    label: t.impact,
+    description: t.impactDesc,
     icon: TrendingUp,
     match: (p) => p.startsWith('/impact'),
   },
 ];
 
-const ADMIN: NavEntry = {
+const adminEntry = (t: Messages['nav']): NavEntry => ({
   href: '/admin',
-  label: 'Admin',
-  description: 'Review company applications',
+  label: t.admin,
+  description: t.adminDesc,
   icon: ShieldCheck,
   match: (p) => p.startsWith('/admin'),
-};
+});
 
 export function Navbar() {
   // useSearchParams needs a Suspense boundary for static rendering.
@@ -120,6 +123,9 @@ function NavbarInner() {
   const scope = useSearchParams().get('scope');
   const router = useRouter();
   const { mode, profile, logout } = useAuth();
+  const t = useT();
+  const n = t.nav;
+  const TRADE = trade(n);
   const [drawer, setDrawer] = useState(false);
   const [scrolled, setScrolled] = useState(false);
 
@@ -127,8 +133,8 @@ function NavbarInner() {
   const isAdmin = profile?.role === 'admin';
   const canBrowse = mode !== 'jwt' || isAdmin || profile?.organization?.status === 'APPROVED';
   // With login on, platform-wide Impact is for admins only.
-  const visible = PRIMARY.filter((e) => e.href !== '/impact' || mode !== 'jwt' || isAdmin);
-  const primary = isAdmin ? [...visible, ADMIN] : visible;
+  const visible = primaryEntries(n).filter((e) => e.href !== '/impact' || mode !== 'jwt' || isAdmin);
+  const primary = isAdmin ? [...visible, adminEntry(n)] : visible;
   const canCreate = canBrowse && !isAdmin;
 
   useEffect(() => {
@@ -156,13 +162,13 @@ function NavbarInner() {
       )}
     >
       <div className="page-shell flex h-16 items-center gap-6">
-        <Link href="/" className="shrink-0 rounded-sm" aria-label="Meguri home">
+        <Link href="/" className="shrink-0 rounded-sm" aria-label={n.home}>
           <Wordmark />
         </Link>
 
         {canBrowse && (
-          <nav aria-label="Main" className="hidden items-center gap-1 lg:flex">
-            <TradeMenu pathname={pathname} scope={scope} active={tradeActive} canCreate={canCreate} />
+          <nav aria-label={n.main} className="hidden items-center gap-1 lg:flex">
+            <TradeMenu entries={TRADE} pathname={pathname} scope={scope} active={tradeActive} canCreate={canCreate} />
             {primary.map((e) => (
               <NavLink key={e.href} href={e.href} active={e.match(pathname, scope)}>
                 {e.label}
@@ -173,12 +179,12 @@ function NavbarInner() {
 
         <div className="ml-auto flex items-center gap-1.5">
           {mode === 'demo' && (
-            <span className="hidden xl:inline-flex" title="No login: use the “Acting as” switchers on each page">
-              <StatusBadge tone="warning">
-                Synthetic demo
-              </StatusBadge>
+            <span className="hidden xl:inline-flex" title={n.demoHint}>
+              <StatusBadge tone="warning">{n.demoBadge}</StatusBadge>
             </span>
           )}
+
+          <LanguageToggle className="hidden sm:inline-flex" />
 
           {canBrowse && <NotificationBell />}
 
@@ -192,8 +198,8 @@ function NavbarInner() {
               aria-current={pathname.startsWith('/messages') ? 'page' : undefined}
             >
               <MessageCircle className="size-4" aria-hidden />
-              <span className="hidden xl:inline">Messages</span>
-              <span className="sr-only xl:hidden">Messages</span>
+              <span className="hidden xl:inline">{n.messages}</span>
+              <span className="sr-only xl:hidden">{n.messages}</span>
               <UnreadBadge />
             </Link>
           )}
@@ -201,10 +207,10 @@ function NavbarInner() {
           {mode === 'jwt' && !signedIn && (
             <div className="hidden items-center gap-1.5 sm:flex">
               <Link href="/login" className="inline-flex h-9 items-center rounded-sm px-3 text-[14px] font-medium text-graphite hover:bg-graphite/[0.05]">
-                Sign in
+                {t.common.signIn}
               </Link>
               <Link href="/signup" className="inline-flex h-9 items-center rounded-sm bg-copper-600 px-3.5 text-[14px] font-medium text-white hover:bg-copper-700">
-                Register
+                {t.common.register}
               </Link>
             </div>
           )}
@@ -214,31 +220,31 @@ function NavbarInner() {
               <Menu
                 align="end"
                 width="w-64"
-                label="Account menu"
+                label={n.accountMenu}
                 triggerClassName="h-9 border-transparent bg-transparent px-2 hover:bg-graphite/[0.05] hover:border-transparent"
                 trigger={
                   <span className="inline-flex max-w-[11rem] items-center gap-2">
                     <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-graphite text-cream">
                       {isAdmin ? <ShieldCheck className="size-3.5" aria-hidden /> : <Building2 className="size-3.5" aria-hidden />}
                     </span>
-                    <span className="truncate text-[14px]">{isAdmin ? 'Administrator' : profile?.organization?.name}</span>
+                    <span className="truncate text-[14px]">{isAdmin ? n.administrator : profile?.organization?.name}</span>
                   </span>
                 }
               >
-                <MenuLabel>Signed in as</MenuLabel>
+                <MenuLabel>{n.signedInAs}</MenuLabel>
                 <p className="truncate px-2.5 pb-2 text-[14px] text-graphite">{profile?.email}</p>
                 <MenuSeparator />
                 <MenuItem icon={<UserRound className="size-4" />} onSelect={() => router.push('/account')}>
-                  My account
+                  {n.myAccount}
                 </MenuItem>
                 {isAdmin && (
                   <MenuItem icon={<ShieldCheck className="size-4" />} onSelect={() => router.push('/admin')}>
-                    Company applications
+                    {n.applications}
                   </MenuItem>
                 )}
                 <MenuSeparator />
                 <MenuItem icon={<LogOut className="size-4" />} onSelect={signOut}>
-                  Sign out
+                  {t.common.signOut}
                 </MenuItem>
               </Menu>
             </div>
@@ -248,7 +254,7 @@ function NavbarInner() {
             type="button"
             onClick={() => setDrawer(true)}
             className="inline-flex h-9 w-9 items-center justify-center rounded-sm text-graphite hover:bg-graphite/[0.06] lg:hidden"
-            aria-label="Open navigation"
+            aria-label={n.openNav}
             aria-expanded={drawer}
             aria-controls="mobile-nav"
           >
@@ -264,39 +270,38 @@ function NavbarInner() {
         scope={scope}
         canBrowse={canBrowse}
         canCreate={canCreate}
+        trade={TRADE}
         primary={primary}
         footer={
           mode === 'jwt' ? (
             signedIn ? (
               <div className="space-y-3">
                 <div className="min-w-0">
-                  <p className="t-label">Signed in</p>
-                  <p className="truncate text-sm text-graphite">{isAdmin ? 'Administrator' : profile?.organization?.name}</p>
+                  <p className="t-label">{n.signedIn}</p>
+                  <p className="truncate text-sm text-graphite">{isAdmin ? n.administrator : profile?.organization?.name}</p>
                   <p className="truncate text-xs text-slate-600">{profile?.email}</p>
                 </div>
                 <div className="flex gap-2">
                   <Link href="/account" className="inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-sm border border-graphite/20 text-sm font-medium">
-                    <UserRound className="size-4" aria-hidden /> Account
+                    <UserRound className="size-4" aria-hidden /> {n.account}
                   </Link>
                   <button type="button" onClick={signOut} className="inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-sm bg-graphite text-sm font-medium text-cream">
-                    <LogOut className="size-4" aria-hidden /> Sign out
+                    <LogOut className="size-4" aria-hidden /> {t.common.signOut}
                   </button>
                 </div>
               </div>
             ) : (
               <div className="flex gap-2">
                 <Link href="/login" className="inline-flex h-10 flex-1 items-center justify-center rounded-sm border border-graphite/20 text-sm font-medium">
-                  Sign in
+                  {t.common.signIn}
                 </Link>
                 <Link href="/signup" className="inline-flex h-10 flex-1 items-center justify-center rounded-sm bg-copper-600 text-sm font-medium text-white">
-                  Register
+                  {t.common.register}
                 </Link>
               </div>
             )
           ) : mode === 'demo' ? (
-            <StatusBadge tone="warning">
-              Synthetic demo mode · use the “Acting as” switchers
-            </StatusBadge>
+            <StatusBadge tone="warning">{n.demoDrawer}</StatusBadge>
           ) : null
         }
       />
@@ -334,7 +339,20 @@ function ActiveRule() {
 }
 
 /** Trade mega menu: opens on hover (with intent delay), click, or keyboard. */
-function TradeMenu({ pathname, scope, active, canCreate }: { pathname: string; scope: string | null; active: boolean; canCreate: boolean }) {
+function TradeMenu({
+  entries,
+  pathname,
+  scope,
+  active,
+  canCreate,
+}: {
+  entries: NavEntry[];
+  pathname: string;
+  scope: string | null;
+  active: boolean;
+  canCreate: boolean;
+}) {
+  const n = useT().nav;
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -393,7 +411,7 @@ function TradeMenu({ pathname, scope, active, canCreate }: { pathname: string; s
           active || open ? 'text-graphite' : 'text-slate-600 hover:bg-graphite/[0.05] hover:text-graphite'
         )}
       >
-        Trade
+        {n.trade}
         <ChevronDown className={cn('size-3.5 transition-transform duration-base ease-out', open && 'rotate-180')} aria-hidden />
         {active && <ActiveRule />}
       </button>
@@ -410,7 +428,7 @@ function TradeMenu({ pathname, scope, active, canCreate }: { pathname: string; s
           >
             <div className="grid w-[40rem] grid-cols-[1fr_15rem] overflow-hidden rounded-md border border-graphite/10 bg-cream-paper shadow-float">
               <ul className="space-y-0.5 p-2">
-                {TRADE.map((e) => {
+                {entries.map((e) => {
                   const current = e.match(pathname, scope);
                   return (
                     <li key={e.href}>
@@ -441,22 +459,22 @@ function TradeMenu({ pathname, scope, active, canCreate }: { pathname: string; s
               </ul>
               <div className="flex flex-col justify-between gap-6 border-l border-graphite/10 bg-sand-50 p-5">
                 <div className="space-y-3">
-                  <p className="t-label">Quick actions</p>
+                  <p className="t-label">{n.quickActions}</p>
                   {canCreate ? (
                     <ul className="space-y-1">
                       <li>
                         <Link href="/supply?compose=1" className="group flex items-center gap-2 py-1.5 text-sm font-medium text-graphite hover:text-copper-700">
-                          <Plus className="size-4 text-copper-600" aria-hidden /> List surplus
+                          <Plus className="size-4 text-copper-600" aria-hidden /> {n.listSurplus}
                         </Link>
                       </li>
                       <li>
                         <Link href="/demand?compose=1" className="group flex items-center gap-2 py-1.5 text-sm font-medium text-graphite hover:text-copper-700">
-                          <Plus className="size-4 text-copper-600" aria-hidden /> Post a requirement
+                          <Plus className="size-4 text-copper-600" aria-hidden /> {n.postRequirement}
                         </Link>
                       </li>
                     </ul>
                   ) : (
-                    <p className="text-[14px] text-slate-600">Administrators can browse the market but not trade.</p>
+                    <p className="text-[14px] text-slate-600">{n.adminNoTrade}</p>
                   )}
                 </div>
               </div>
@@ -475,6 +493,7 @@ function MobileDrawer({
   scope,
   canBrowse,
   canCreate,
+  trade: tradeEntries,
   primary,
   footer,
 }: {
@@ -484,9 +503,11 @@ function MobileDrawer({
   scope: string | null;
   canBrowse: boolean;
   canCreate: boolean;
+  trade: NavEntry[];
   primary: NavEntry[];
   footer: ReactNode;
 }) {
+  const n = useT().nav;
   const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -541,7 +562,7 @@ function MobileDrawer({
             ref={panelRef}
             role="dialog"
             aria-modal="true"
-            aria-label="Navigation"
+            aria-label={n.navigation}
             initial={{ x: '100%' }}
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
@@ -550,25 +571,26 @@ function MobileDrawer({
           >
             <div className="flex h-16 items-center justify-between border-b border-graphite/10 px-5">
               <Wordmark />
-              <button type="button" onClick={onClose} className="rounded-sm p-2 text-graphite hover:bg-graphite/[0.06]" aria-label="Close navigation">
+              <button type="button" onClick={onClose} className="rounded-sm p-2 text-graphite hover:bg-graphite/[0.06]" aria-label={n.closeNav}>
                 <X className="size-5" />
               </button>
             </div>
-            <nav aria-label="Mobile" className="flex-1 overflow-y-auto px-3 py-5">
+            <nav aria-label={n.mobile} className="flex-1 overflow-y-auto px-3 py-5">
+              <LanguageToggle className="mb-5 ml-4" />
               {canBrowse ? (
                 <div className="space-y-6">
                   <div>
-                    <p className="t-label px-4 pb-1">Trade</p>
-                    <ul>{TRADE.map(item)}</ul>
+                    <p className="t-label px-4 pb-1">{n.trade}</p>
+                    <ul>{tradeEntries.map(item)}</ul>
                   </div>
                   <div>
-                    <p className="t-label px-4 pb-1">Coordinate</p>
+                    <p className="t-label px-4 pb-1">{n.coordinate}</p>
                     <ul>
                       {primary.map(item)}
                       {item({
                         href: '/messages',
-                        label: 'Messages',
-                        description: 'Buyer ↔ supplier conversations',
+                        label: n.messages,
+                        description: n.messagesDesc,
                         icon: MessageCircle,
                         match: (p) => p.startsWith('/messages'),
                       })}
@@ -577,16 +599,16 @@ function MobileDrawer({
                   {canCreate && (
                     <div className="flex gap-2 px-1">
                       <Link href="/supply?compose=1" onClick={onClose} className="inline-flex h-10 flex-1 items-center justify-center gap-1.5 rounded-sm bg-copper-600 text-sm font-medium text-white">
-                        <Plus className="size-4" aria-hidden /> List surplus
+                        <Plus className="size-4" aria-hidden /> {n.listSurplus}
                       </Link>
                       <Link href="/demand?compose=1" onClick={onClose} className="inline-flex h-10 flex-1 items-center justify-center gap-1.5 rounded-sm border border-graphite/20 text-sm font-medium">
-                        <Plus className="size-4" aria-hidden /> Requirement
+                        <Plus className="size-4" aria-hidden /> {n.requirementShort}
                       </Link>
                     </div>
                   )}
                 </div>
               ) : (
-                <p className="px-4 text-sm text-slate-600">Sign in with an approved company account to browse the marketplace.</p>
+                <p className="px-4 text-sm text-slate-600">{n.signInToBrowse}</p>
               )}
             </nav>
             {footer && <div className="border-t border-graphite/10 px-5 py-4">{footer}</div>}
