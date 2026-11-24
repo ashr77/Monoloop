@@ -235,6 +235,11 @@ class TranscribeAudioRequest(StrictInput):
         return base
 
 
+class ImageUploadRequest(StrictInput):
+    image_base64: Annotated[str, StringConstraints(min_length=16, max_length=30_000_000)]
+    mime_type: Literal["image/jpeg", "image/png", "image/webp"]
+
+
 class ExtractRequirementRequest(StrictInput):
     prompt: Annotated[str, StringConstraints(min_length=5, max_length=2000)]
     mock: bool | None = None

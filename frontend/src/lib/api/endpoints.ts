@@ -41,6 +41,13 @@ export interface MatchOverviewRow {
   result: MatchResult;
 }
 
+export interface UploadedImage {
+  url: string;
+  path: string;
+  size_bytes: number;
+  mime_type: string;
+}
+
 export interface TranscribeAudioInput {
   audio_base64: string;
   mime_type: string;
@@ -81,6 +88,14 @@ export const api = {
       apiRequest<MaterialListing>('/api/listings', { method: 'POST', body, organizationId }).then((r) => r.data),
     update: (id: string, body: ListingInput, organizationId: string) =>
       apiRequest<MaterialListing>(`/api/listings/${enc(id)}`, { method: 'PATCH', body, organizationId }).then((r) => r.data),
+  },
+
+  uploads: {
+    /** Store a listing photo; the returned URL goes into `image_url` like a pasted link. */
+    listingImage: (body: { image_base64: string; mime_type: string }, organizationId: string) =>
+      apiRequest<UploadedImage>('/api/uploads/listing-image', { method: 'POST', body, organizationId, timeoutMs: 60_000 }).then(
+        (r) => r.data
+      ),
   },
 
   requirements: {

@@ -36,6 +36,7 @@ from app.services.impact import ImpactService
 from app.services.matching.service import MatchingService
 from app.services.payments.gateway import PaymentGateway, SSLCommerzGateway
 from app.services.payments.service import PaymentService
+from app.services.storage import ImageUploadService, build_image_store
 from app.services.supply import ListingService, OrganizationService
 
 
@@ -60,6 +61,8 @@ class Container:
         self.extraction = ExtractionService(self.settings, self.http)
         self.auth = AuthService(self.repos, build_auth_provider(self.settings, self.http))
         self.transcription = TranscriptionService(self.settings, self.http)
+        self.images = ImageUploadService(build_image_store(self.settings, self.http, self.repos.backend),
+                                         self.settings.max_image_bytes)
 
     async def aclose(self) -> None:
         await self.http.aclose()

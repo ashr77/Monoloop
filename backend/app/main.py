@@ -7,10 +7,12 @@ from __future__ import annotations
 
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app.api.deps import build_container
 from app.api.routes import admin, auth, chat, demand, exchange, matching, payment, supply, system
@@ -22,6 +24,7 @@ from app.core.middleware import (
     RequestContextMiddleware,
     SecurityHeadersMiddleware,
 )
+from app.services.storage import LOCAL_UPLOAD_ROUTE
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 logger = logging.getLogger("monoloop")
@@ -59,10 +62,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     register_exception_handlers(app)
     for module in (system, auth, admin, supply, demand, matching, exchange, payment, chat):
         app.include_router(module.router)
+    # Listing photos saved on local disk (offline demo; Supabase Storage serves its own files).
+    upload_root = Path(settings.upload_dir)
+    upload_root.mkdir(parents=True, exist_ok=True)
+    app.mount(LOCAL_UPLOAD_ROUTE, StaticFiles(directory=upload_root), name="uploads")
 
     # Added innermost first; the last one added runs first on each request.
     app.add_middleware(BodySizeLimitMiddleware, max_bytes=settings.max_body_bytes,
-                       path_limits={"/api/ai/transcribe": settings.max_transcribe_body_bytes})
+                       path_limits={"/api/ai/transcribe": settings.max_transcribe_body_bytes,
+                                    "/api/uploads/listing-image": settings.max_image_body_bytes})
     app.add_middleware(RateLimitMiddleware, reads_per_minute=settings.rate_limit_per_minute,
                        writes_per_minute=settings.rate_limit_writes_per_minute)
     app.add_middleware(GZipMiddleware, minimum_size=1024)
