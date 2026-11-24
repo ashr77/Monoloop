@@ -22,7 +22,7 @@ With `DATA_BACKEND=auto`: Postgres if `DATABASE_URL` is set, otherwise Supabase 
 
 Live check of the `supabase` backend (writes one CANCELLED exchange, leaves stock unchanged): `MONOLOOP_LIVE_SUPABASE=1 .venv/bin/pytest tests/test_supabase_live.py`
 
-Apply `../supabase/migrations/00001` → `00007` first. The schema lives only in those migrations; `app/repositories/postgres/tables.py` describes it and never alters it. `GET /api/health` reports the active backend and whether the database answers.
+Apply `../supabase/migrations/00001` → `00008` first. The schema lives only in those migrations; `app/repositories/postgres/tables.py` describes it and never alters it. `GET /api/health` reports the active backend and whether the database answers.
 
 ## Architecture
 

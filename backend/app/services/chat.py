@@ -1,7 +1,7 @@
 """Buyer ↔ supplier chat about a listing (Member 1).
 
 The write rules (who may open a chat, participants only, unread counters) are atomic in the
-repository (PL/pgSQL in migration 00007, mirrored in memory). This service adds participant
+repository (PL/pgSQL in migration 00008, mirrored in memory). This service adds participant
 checks for reads and assembles the read models. It never touches orders, prices or stock:
 ordering is the direct listing order flow (ExchangeService.request_listing).
 """

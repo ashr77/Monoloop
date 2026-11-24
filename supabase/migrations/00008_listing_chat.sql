@@ -1,7 +1,7 @@
 -- ============================================================================
 -- MONOLOOP - Buyer ↔ supplier chat about a listing (Member 1)
 -- TSUNAGU Hackathon 2026
--- Migration: 00007_listing_chat.sql   (run after 00001 → 00006; safe to re-run)
+-- Migration: 00008_listing_chat.sql   (run after 00001 → 00007; safe to re-run)
 --
 -- One conversation per (listing, buyer). Messages only: the chat never creates
 -- orders, prices or reservations. Ordering stays the direct listing order flow

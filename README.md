@@ -69,4 +69,4 @@ Refer to [TEAM_CONTRACTS.md](docs/TEAM_CONTRACTS.md) for full contracts, databas
 - Matching engine: [docs/MATCHING.md](docs/MATCHING.md)
 - Exchanges, atomic reservation & impact: [docs/EXCHANGES.md](docs/EXCHANGES.md)
 
-**Database:** apply `supabase/migrations/00001` → `00007` in order (`00004` adds the atomic exchange functions, `00006` direct listing orders, `00007` the buyer ↔ supplier chat).
+**Database:** apply `supabase/migrations/00001` → `00008` in order (`00004` adds the atomic exchange functions, `00006` direct listing orders, `00007` payments, `00008` the buyer ↔ supplier chat).

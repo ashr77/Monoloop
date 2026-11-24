@@ -44,7 +44,8 @@ class InMemoryStore:
         self.exchanges: dict[str, ExchangeRecord] = {}
         self.items: dict[str, ExchangeItemRecord] = {}
         self.logs: list[ActivityLog] = []
-        # Buyer ↔ supplier chat (migration 00007)
+        self.payments: dict = {}  # tran_id -> PaymentRecord (repositories/memory/payments.py)
+        # Buyer ↔ supplier chat (migration 00008)
         self.conversations: dict[str, ConversationRecord] = {}
         self.chat_messages: list[ChatMessage] = []
         self.chat_seq = 0

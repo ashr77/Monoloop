@@ -15,6 +15,7 @@ from typing import Literal, Protocol
 from app.schemas.chat import ChatMessage, ConversationRecord
 from app.schemas.entities import Listing, Organization, Requirement
 from app.schemas.exchange import ExchangeView
+from app.schemas.payment import PaymentRecord
 
 ExchangeActionName = Literal["accept", "reject", "complete", "cancel"]
 
@@ -83,7 +84,7 @@ class ExchangeRepository(Protocol):
 
 class ChatRepository(Protocol):
     """Buyer ↔ supplier chat. Writes are atomic with the same rules everywhere
-    (PL/pgSQL in migration 00007, mirrored in memory/chat.py)."""
+    (PL/pgSQL in migration 00008, mirrored in memory/chat.py)."""
 
     async def open_conversation(self, listing_id: str, buyer_id: str) -> str: ...
     async def get_conversation(self, conversation_id: str) -> ConversationRecord | None: ...
@@ -91,6 +92,15 @@ class ChatRepository(Protocol):
     async def messages(self, conversation_id: str, after_seq: int, limit: int) -> list[ChatMessage]: ...
     async def post_message(self, conversation_id: str, actor_id: str, body: str) -> str: ...
     async def mark_read(self, conversation_id: str, actor_id: str) -> None: ...
+
+class PaymentRepository(Protocol):
+    async def create(self, data: dict) -> PaymentRecord: ...
+    async def get_by_tran_id(self, tran_id: str) -> PaymentRecord | None: ...
+    async def for_exchanges(self, exchange_ids: list[str]) -> list[PaymentRecord]: ...
+    async def set_session(self, tran_id: str, session_key: str) -> None: ...
+    async def finalize(self, tran_id: str, status: str, fields: dict) -> PaymentRecord | None:
+        """INITIATED -> status in one conditional update. Returns None if it was not INITIATED."""
+        ...
 
 
 @dataclass(slots=True)
@@ -103,3 +113,4 @@ class Repositories:
     exchanges: ExchangeRepository
     chat: ChatRepository
     backend: Literal["memory", "postgres", "supabase"]
+    payments: PaymentRepository | None = None

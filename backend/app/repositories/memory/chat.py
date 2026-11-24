@@ -1,4 +1,4 @@
-"""Chat rules for the in-memory store. Mirrors supabase/migrations/00007_listing_chat.sql rule for
+"""Chat rules for the in-memory store. Mirrors supabase/migrations/00008_listing_chat.sql rule for
 rule. Callers hold the store lock; each operation validates first, then mutates."""
 
 from __future__ import annotations

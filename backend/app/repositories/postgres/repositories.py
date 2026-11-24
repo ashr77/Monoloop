@@ -343,7 +343,7 @@ class PgExchangeRepository:
 
 
 class PgChatRepository:
-    """Buyer ↔ supplier chat. Every write is one call to a migration-00007 function."""
+    """Buyer ↔ supplier chat. Every write is one call to a migration-00008 function."""
 
     def __init__(self, engine: AsyncEngine):
         self.engine = engine

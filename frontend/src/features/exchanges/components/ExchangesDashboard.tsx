@@ -16,6 +16,7 @@ import {
   Check,
   CheckCircle2,
   ChevronDown,
+  CreditCard,
   Info,
   Loader2,
   PackageCheck,
@@ -25,7 +26,7 @@ import {
 } from 'lucide-react';
 import type { Organization } from '@/lib/types';
 import type { ExchangeAction, ExchangeStage, ExchangeView } from '../types';
-import { useExchangeAction, useExchanges, useOrganizations } from '@/hooks';
+import { useExchangeAction, useExchanges, useOrganizations, useStartPayment } from '@/hooks';
 import { errorMessage } from '@/lib/api/client';
 import {
   ACTIVITY_LABEL,
@@ -71,6 +72,23 @@ export function ExchangesDashboard() {
   const orgsData = useOrganizations().data;
   const organizations = useMemo(() => orgsData ?? [], [orgsData]);
   const exchangeAction = useExchangeAction();
+  const startPayment = useStartPayment();
+
+  // Back from the payment gateway: the backend has validated the payment and adds ?payment=…
+  const paymentReturn = searchParams.get('payment');
+  useEffect(() => {
+    if (!paymentReturn) return;
+    const messages: Record<string, Toast> = {
+      success: { kind: 'success', message: 'Payment received and verified. You can now confirm the transfer.' },
+      failed: { kind: 'error', message: 'Payment failed or could not be verified. No money was recorded; you can try again.' },
+      cancelled: { kind: 'error', message: 'Payment cancelled. You can pay again whenever you are ready.' },
+      invalid: { kind: 'error', message: 'Unknown payment reference. Please try again.' },
+    };
+    setToast(messages[paymentReturn] ?? messages.invalid);
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete('payment');
+    router.replace(`/exchanges${params.size ? `?${params}` : ''}`, { scroll: false });
+  }, [paymentReturn, searchParams, router]);
 
   useEffect(() => {
     if (!toast) return;
@@ -117,6 +135,18 @@ export function ExchangesDashboard() {
     } catch (error) {
       setToast({ kind: 'error', message: errorMessage(error, 'Action failed.') });
     } finally {
+      setBusy(null);
+    }
+  }
+
+  async function pay(ex: ExchangeView) {
+    if (actingAs === 'ALL') return;
+    setBusy(`${ex.id}:pay:`);
+    try {
+      const session = await startPayment.mutateAsync({ exchangeId: ex.id, organizationId: actingAs });
+      window.location.assign(session.gateway_url); // SSLCommerz checkout page
+    } catch (error) {
+      setToast({ kind: 'error', message: errorMessage(error, 'Could not start the payment.') });
       setBusy(null);
     }
   }
@@ -282,6 +312,7 @@ export function ExchangesDashboard() {
               highlighted={ex.id === highlight}
               busy={busy}
               onAct={act}
+              onPay={pay}
               onSwitch={setActingAs}
               orgName={orgName}
             />
@@ -341,11 +372,12 @@ interface CardProps {
   highlighted: boolean;
   busy: string | null;
   onAct: (ex: ExchangeView, action: ExchangeAction, itemId?: string) => void;
+  onPay: (ex: ExchangeView) => void;
   onSwitch: (orgId: string) => void;
   orgName: (id: string) => string;
 }
 
-function ExchangeCard({ ex, actingAs, highlighted, busy, onAct, onSwitch, orgName }: CardProps) {
+function ExchangeCard({ ex, actingAs, highlighted, busy, onAct, onPay, onSwitch, orgName }: CardProps) {
   const req = ex.requirement;
   const stage = STAGE_META[ex.stage];
   const isBuyer = actingAs === ex.buyer_organization_id;
@@ -354,6 +386,8 @@ function ExchangeCard({ ex, actingAs, highlighted, busy, onAct, onSwitch, orgNam
   const active = ex.stage !== 'COMPLETED' && ex.stage !== 'CANCELLED';
   const isBusy = (action: string, itemId = '') => busy === `${ex.id}:${action}:${itemId}`;
   const anyBusy = busy?.startsWith(ex.id) ?? false;
+  const paid = ex.payment?.status === 'PAID';
+  const needsPayment = Boolean(ex.payment_required) && !paid;
 
   return (
     <article
@@ -369,6 +403,11 @@ function ExchangeCard({ ex, actingAs, highlighted, busy, onAct, onSwitch, orgNam
             <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold border ${stage.className}`}>{stage.label}</span>
             {role && (
               <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-900 text-white">You: {role}</span>
+            )}
+            {paid && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border bg-emerald-50 text-emerald-800 border-emerald-200">
+                <CreditCard className="w-3 h-3" /> Paid{ex.payment?.card_type ? ` · ${ex.payment.card_type}` : ''}
+              </span>
             )}
             <span className="text-xs text-slate-400 font-mono">#{ex.id.slice(0, 8)}</span>
           </div>
@@ -488,7 +527,11 @@ function ExchangeCard({ ex, actingAs, highlighted, busy, onAct, onSwitch, orgNam
       {active && (
         <div className="px-5 py-4 bg-slate-50 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <p className="text-xs text-slate-500">
-            {ex.stage === 'RESERVED'
+            {ex.stage === 'RESERVED' && needsPayment
+              ? `All suppliers accepted and the stock is reserved. Pay ${bdt(ex.total_value_bdt)} securely with SSLCommerz, then confirm the transfer.`
+              : ex.stage === 'RESERVED' && paid
+              ? `Paid ${bdt(ex.payment!.amount_bdt)} (ref ${ex.payment!.tran_id}). Confirm once the materials have been handed over.`
+              : ex.stage === 'RESERVED'
               ? 'All suppliers accepted and the stock is reserved. Confirm once the materials have been handed over.'
               : ex.stage === 'SUPPLIER_DECLINED'
                 ? 'Cancel to release the stock other suppliers reserved.'
@@ -498,16 +541,29 @@ function ExchangeCard({ ex, actingAs, highlighted, busy, onAct, onSwitch, orgNam
             <div className="flex gap-2">
               <button
                 onClick={() => onAct(ex, 'cancel')}
-                disabled={anyBusy}
+                disabled={anyBusy || paid}
+                title={paid ? 'Paid exchanges cannot be cancelled (refunds are not supported in this prototype)' : undefined}
                 className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-slate-300 bg-white hover:bg-slate-100 disabled:opacity-60 text-slate-700 text-xs font-bold"
               >
                 {isBusy('cancel') ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Undo2 className="w-3.5 h-3.5" />}
                 Cancel exchange
               </button>
+              {ex.stage === 'RESERVED' && needsPayment && (
+                <button
+                  onClick={() => onPay(ex)}
+                  disabled={anyBusy}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 disabled:opacity-60 text-white text-xs font-bold"
+                >
+                  {isBusy('pay') ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CreditCard className="w-3.5 h-3.5" />}
+                  Pay {bdt(ex.total_value_bdt)}
+                </button>
+              )}
               <button
                 onClick={() => onAct(ex, 'complete')}
-                disabled={anyBusy || ex.stage !== 'RESERVED'}
-                title={ex.stage !== 'RESERVED' ? 'Every supplier must accept first' : undefined}
+                disabled={anyBusy || ex.stage !== 'RESERVED' || needsPayment}
+                title={
+                  ex.stage !== 'RESERVED' ? 'Every supplier must accept first' : needsPayment ? 'Pay for the exchange first' : undefined
+                }
                 className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white text-xs font-bold"
               >
                 {isBusy('complete') ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <PackageCheck className="w-3.5 h-3.5" />}

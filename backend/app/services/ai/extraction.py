@@ -283,6 +283,9 @@ def _parse_model_json(raw: str) -> MaterialExtraction:
         raise ExtractionFailed("AI extracted attributes did not conform to required specification schema.") from exc
 
 
+_TRANSIENT = frozenset({429, 500, 502, 503, 504})
+
+
 def _parse_requirement_json(raw: str) -> RequirementExtraction:
     cleaned = re.sub(r"```json\n?|\n?```", "", raw).strip()
     try:
@@ -300,9 +303,6 @@ def _parse_requirement_json(raw: str) -> RequirementExtraction:
         if minimum is not None and maximum is not None and minimum > maximum:
             raise ExtractionFailed("AI extracted a dimension range whose minimum exceeds its maximum.")
     return result
-
-
-_TRANSIENT = frozenset({429, 500, 502, 503, 504})
 
 
 class _HttpExtractor:

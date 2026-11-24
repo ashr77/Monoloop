@@ -173,6 +173,46 @@ async def test_exchange_list_for_org_includes_supplied_exchanges():
     assert seen["exchanges"].url.params["or"] == f"(buyer_organization_id.eq.{SUP_GAZIPUR},id.in.({EX}))"
 
 
+# --- pasted configuration is cleaned -------------------------------------------------------
+
+@pytest.mark.parametrize("url", [
+    "https://x.supabase.co", " https://x.supabase.co ", "https://x.supabase.co/", '"https://x.supabase.co"',
+    "https://x.supabase.co/rest/v1", "https://x.supabase.co\n",
+])
+def test_supabase_url_paste_variants_are_normalised(url):
+    assert make_settings(supabase_url=url).supabase_url == "https://x.supabase.co"
+
+
+def test_supabase_url_without_scheme_fails_fast():
+    with pytest.raises(ValueError, match="https://"):
+        make_settings(supabase_url="x.supabase.co")
+
+
+@pytest.mark.parametrize("key", ["abc.def.ghi", " abc.def.ghi\n", '"abc.def.ghi"', "abc.def\n.ghi", "'abc.def.ghi' "])
+def test_keys_lose_whitespace_and_quotes(key):
+    s = make_settings(supabase_service_role_key=key, sslcommerz_store_password=key, ai_api_key=key)
+    assert s.supabase_service_role_key == s.sslcommerz_store_password == s.ai_api_key == "abc.def.ghi"
+
+
+async def test_health_reports_failure_type_not_details():
+    from app.api.deps import build_container
+    from app.main import create_app
+
+    settings = make_settings(data_backend="supabase", supabase_url="https://x.supabase.co",
+                             supabase_service_role_key="k")
+    app = create_app(settings)
+    app.state.container = build_container(settings)
+
+    def down(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("boom secret-ish detail", request=request)
+
+    app.state.container.rest = httpx.AsyncClient(transport=httpx.MockTransport(down), base_url="https://x/rest/v1")
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://t") as c:
+        data = (await c.get("/api/health")).json()["data"]
+    assert data["database"] == "unreachable (ConnectError)"
+    await app.state.container.aclose()
+
+
 # --- buyer ↔ supplier chat ----------------------------------------------------------------
 
 CONV = "d0000000-0000-4000-8000-0000000000c1"

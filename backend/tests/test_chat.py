@@ -1,7 +1,7 @@
 """Buyer ↔ supplier chat about a listing.
 
 Every test runs through the HTTP API on the in-memory backend and, when
-MONOLOOP_TEST_DATABASE_URL points at a disposable PostgreSQL with migrations 00001-00007 applied,
+MONOLOOP_TEST_DATABASE_URL points at a disposable PostgreSQL with migrations 00001-00008 applied,
 again on the postgres backend (the PL/pgSQL rules). That database is reset before each test.
 
     docker run -d --rm --name monoloop-pgtest -e POSTGRES_PASSWORD=test -p 55432:5432 postgres:16-alpine

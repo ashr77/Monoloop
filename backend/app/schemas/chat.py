@@ -1,5 +1,5 @@
 """Buyer ↔ supplier chat about a listing (Member 1). Messages only: ordering is the direct
-listing order flow (migration 00006). Records mirror supabase/migrations/00007_listing_chat.sql;
+listing order flow (migration 00006). Records mirror supabase/migrations/00008_listing_chat.sql;
 views match frontend/src/features/chat/types.ts.
 """
 

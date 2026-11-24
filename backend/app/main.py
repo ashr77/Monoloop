@@ -13,7 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 
 from app.api.deps import build_container
-from app.api.routes import chat, demand, exchange, matching, supply, system
+from app.api.routes import chat, demand, exchange, matching, payment, supply, system
 from app.core.config import Settings, get_settings
 from app.core.errors import register_exception_handlers
 from app.core.middleware import (
@@ -51,7 +51,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         openapi_url=None if is_prod else "/openapi.json",
     )
     register_exception_handlers(app)
-    for module in (system, supply, demand, matching, exchange, chat):
+    for module in (system, supply, demand, matching, exchange, payment, chat):
         app.include_router(module.router)
 
     # Added innermost first; the last one added runs first on each request.

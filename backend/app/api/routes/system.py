@@ -29,11 +29,12 @@ async def health(c: ContainerDep):
     elif c.rest is not None:
         try:
             r = await c.rest.get("/organizations", params={"select": "id", "limit": "1"})
-            database = "ok" if r.status_code == 200 else "unreachable"
-        except Exception:  # noqa: BLE001
-            database = "unreachable"
+            database = "ok" if r.status_code == 200 else f"error (HTTP {r.status_code})"
+        except Exception as exc:  # noqa: BLE001 - health reports the failure type, never details
+            database = f"unreachable ({type(exc).__name__})"
     return ok({"status": "ok", "data_backend": c.repos.backend, "database": database,
-               "engine_version": ENGINE_VERSION, "ai_configured": c.settings.ai_configured})
+               "engine_version": ENGINE_VERSION, "ai_configured": c.settings.ai_configured,
+               "payment_configured": c.payments.enabled})
 
 
 @router.post("/ai/extract-material", response_model=ApiResponse[MaterialExtraction], tags=["supply"])

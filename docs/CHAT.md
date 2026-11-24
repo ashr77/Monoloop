@@ -4,7 +4,7 @@ A buyer can ask a supplier about a listing before ordering it. The chat contains
 
 | Item | Location |
 | :-- | :-- |
-| Database | `supabase/migrations/00007_listing_chat.sql` (run after 00001–00006; safe to re-run) |
+| Database | `supabase/migrations/00008_listing_chat.sql` (run after 00001–00007; safe to re-run) |
 | Rules for the in-memory demo store | `backend/app/repositories/memory/chat.py` (mirrors the SQL) |
 | Service / API | `backend/app/services/chat.py`, `backend/app/api/routes/chat.py` |
 | UI | `/messages` (inbox), `/messages/[id]?as=<orgId>` (chat), **Chat** button on the Supply table |

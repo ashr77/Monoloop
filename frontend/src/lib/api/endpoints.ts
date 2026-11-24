@@ -5,7 +5,7 @@
 
 import type { MaterialListing, MaterialRequirement, Organization } from '@/lib/types';
 import type { MatchResult } from '@/features/matching/types';
-import type { ExchangeAction, ExchangeView } from '@/features/exchanges/types';
+import type { ExchangeAction, ExchangeView, PaymentStart } from '@/features/exchanges/types';
 import type { ImpactReport } from '@/features/analytics/impact';
 import type { ConversationSummary, ConversationView } from '@/features/chat/types';
 import type { MaterialExtractionResult, RequirementExtractionResult, SpeechLanguage } from '@/lib/ai/schemas';
@@ -127,6 +127,16 @@ export const api = {
         method: 'POST',
         body: itemId ? { exchange_item_id: itemId } : {},
         organizationId,
+      }).then((r) => r.data),
+  },
+
+  payments: {
+    /** Starts an SSLCommerz payment for a RESERVED exchange; the browser then goes to gateway_url. */
+    start: (exchangeId: string, organizationId: string) =>
+      apiRequest<PaymentStart>(`/api/payments/exchanges/${enc(exchangeId)}`, {
+        method: 'POST',
+        organizationId,
+        timeoutMs: 30_000,
       }).then((r) => r.data),
   },
 

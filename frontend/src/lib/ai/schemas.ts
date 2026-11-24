@@ -43,6 +43,7 @@ export const SPEECH_LANGUAGES = [
 
 export type SpeechLanguage = (typeof SPEECH_LANGUAGES)[number]['code'];
 
+
 export const requirementExtractionSchema = z.object({
   material_family: z.enum(MATERIAL_FAMILIES).nullable(),
   material_specification: z.string().nullable(),
