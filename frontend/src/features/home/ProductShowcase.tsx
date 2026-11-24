@@ -20,44 +20,34 @@ import { cn } from '@/lib/utils';
 
 type Panel = 'market' | 'inventory' | 'requirements' | 'matching' | 'exchange';
 
-const PANELS: { value: Panel; label: string; title: string; body: string; href: string; cta: string }[] = [
+const PANELS: { value: Panel; label: string; href: string; cta: string }[] = [
   {
     value: 'market',
     label: 'Marketplace',
-    title: 'Search surplus by specification, not by name.',
-    body: 'Every active listing with its grade, exact dimensions, available stock, unit price and location. Filter, sort and switch between a dense table and a visual grid.',
     href: '/supply?scope=all',
     cta: 'Explore the marketplace',
   },
   {
     value: 'inventory',
     label: 'Supplier inventory',
-    title: 'Stock you can trust, down to the piece.',
-    body: 'Available is always total minus reserved. Reserved stock is held only by accepted exchanges and released automatically when one is cancelled.',
     href: '/supply',
     cta: 'Manage inventory',
   },
   {
     value: 'requirements',
     label: 'Buyer requirements',
-    title: 'Describe exactly what production needs.',
-    body: 'Exact sizes or ranges, thickness tolerances, condition, budget, and whether several suppliers may combine to fill the order.',
     href: '/demand',
     cta: 'View requirements',
   },
   {
     value: 'matching',
     label: 'Matching',
-    title: 'Every match shows its working.',
-    body: 'Each listing is checked against eight mandatory rules. You see which passed, which failed and why — then the cheapest delivered allocation across suppliers.',
     href: '/matches',
     cta: 'Open matching',
   },
   {
     value: 'exchange',
     label: 'Exchange',
-    title: 'From proposal to transfer, one accountable flow.',
-    body: 'The buyer requests; each supplier accepts or declines its share and stock is reserved atomically; the buyer pays where enabled and confirms the transfer.',
     href: '/exchanges',
     cta: 'See exchanges',
   },
@@ -113,8 +103,6 @@ export function ProductShowcase() {
             transition={{ duration: 0.32, ease: EASE_OUT }}
             className="space-y-3"
           >
-            <h3 className="text-heading-md font-medium">{meta.title}</h3>
-            <p className="text-[15px] leading-relaxed text-slate-600">{meta.body}</p>
             <Link href={meta.href} className="group inline-flex items-center gap-1.5 pt-1 text-sm font-medium text-copper-700">
               {meta.cta}
               <ArrowRight className="size-4 transition-transform duration-base group-hover:translate-x-0.5" aria-hidden />

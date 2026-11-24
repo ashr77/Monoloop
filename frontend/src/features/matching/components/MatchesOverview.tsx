@@ -109,7 +109,6 @@ export function MatchesOverview() {
     <div className="min-h-[calc(100vh-9rem)] bg-cream text-graphite">
       <div className="page-shell space-y-8 pb-16">
         <header className="space-y-4 border-b rule pb-10 pt-10 sm:pt-12">
-          <p className="t-eyebrow">Matching · live</p>
           <h1 className="text-heading-lg font-medium sm:text-display-md">
             {fulfilled} of {rows.length} open requirements
             <br />

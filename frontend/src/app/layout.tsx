@@ -6,7 +6,7 @@ import { fontMono, fontSans } from '@/lib/fonts';
 import { Providers } from './providers';
 
 export const metadata: Metadata = {
-  title: 'MONOLOOP | Industrial Surplus Matching & Resource Exchange',
+  title: 'Meguri | Industrial Surplus Matching & Resource Exchange',
   description:
     'One Industry’s Surplus. Another’s Opportunity. Explainable industrial surplus matching and resource recovery for the TSUNAGU Hackathon 2026.',
 };

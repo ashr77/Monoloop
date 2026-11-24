@@ -116,7 +116,7 @@ export function HeroNetwork() {
         aria-labelledby="hero-network-title"
       >
         <title id="hero-network-title">
-          Illustration: surplus from suppliers is checked by MONOLOOP against each buyer requirement before the two are connected.
+          Illustration: surplus from suppliers is checked by Meguri against each buyer requirement before the two are connected.
         </title>
 
         {/* Engineering grid */}
@@ -177,7 +177,7 @@ export function HeroNetwork() {
             <rect x="16" y="0" width="22" height="22" rx="11" fill="none" stroke="#C66B3D" strokeWidth="2" />
           </g>
           <text y={14} textAnchor="middle" fontSize={11} letterSpacing="0.16em" fill="#F8F5ED" fontWeight={600}>
-            MONOLOOP
+            MEGURI
           </text>
           <text y={30} textAnchor="middle" fontSize={9.5} letterSpacing="0.08em" fill="#E5D5BD" className="font-mono">
             {phase === 1 ? 'CHECKING RULES' : connected ? 'COMPATIBLE' : 'MATCHING'}

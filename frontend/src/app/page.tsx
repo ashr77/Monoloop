@@ -19,7 +19,7 @@ export default function HomePage() {
                 One workspace for both sides of the exchange.
               </h2>
               <p className="max-w-2xl text-[15px] leading-relaxed text-slate-700">
-                These are the working MONOLOOP views, rendered with live data from the platform. Every company account can both
+                These are the working Meguri views, rendered with live data from the platform. Every company account can both
                 supply and buy.
               </p>
             </div>

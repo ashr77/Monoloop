@@ -42,7 +42,7 @@ export default function PendingPage() {
       tone: 'warning',
       badge: 'Pending review',
       title: 'Waiting for approval',
-      text: 'A MONOLOOP admin is verifying your trade licence. You can trade as soon as it is approved.',
+      text: 'A Meguri admin is verifying your trade licence. You can trade as soon as it is approved.',
       steps: [
         'An admin checks your company name and trade licence number.',
         'This page checks for a decision every 20 seconds, or press Check status.',
@@ -64,8 +64,8 @@ export default function PendingPage() {
       tone: 'danger',
       badge: 'Suspended',
       title: 'Account suspended',
-      text: 'Contact the MONOLOOP admin to restore access.',
-      steps: ['Contact the MONOLOOP admin, quoting your company name and licence number.', 'Trading resumes once the admin restores access.'],
+      text: 'Contact the Meguri admin to restore access.',
+      steps: ['Contact the Meguri admin, quoting your company name and licence number.', 'Trading resumes once the admin restores access.'],
     },
     APPROVED: { tone: 'success', badge: 'Approved', title: '', text: '', steps: [] },
   };

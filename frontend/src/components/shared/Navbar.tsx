@@ -155,7 +155,7 @@ function NavbarInner() {
       )}
     >
       <div className="page-shell flex h-16 items-center gap-6">
-        <Link href="/" className="shrink-0 rounded-sm" aria-label="MONOLOOP home">
+        <Link href="/" className="shrink-0 rounded-sm" aria-label="Meguri home">
           <Wordmark />
         </Link>
 
@@ -456,9 +456,6 @@ function TradeMenu({ pathname, scope, active, canCreate }: { pathname: string; s
                     <p className="text-[13px] text-slate-600">Administrators can browse the market but not trade.</p>
                   )}
                 </div>
-                <p className="text-[13px] leading-relaxed text-slate-600">
-                  Matches are proposals. Stock is reserved only when every supplier accepts.
-                </p>
               </div>
             </div>
           </motion.div>

@@ -3,7 +3,7 @@ import { TableSkeleton } from '@/components/ui';
 import { SupplierDashboard } from '@/features/supply/components/SupplierDashboard';
 
 export const metadata = {
-  title: 'Supplier Portal | MONOLOOP',
+  title: 'Supplier Portal | Meguri',
   description: 'Manage industrial surplus inventory, offcuts, and AI-assisted listings.',
 };
 

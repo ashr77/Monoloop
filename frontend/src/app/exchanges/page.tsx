@@ -3,7 +3,7 @@ import { ExchangesDashboard } from '@/features/exchanges/components/ExchangesDas
 import { TableSkeleton } from '@/components/ui';
 
 export const metadata = {
-  title: 'Exchanges | MONOLOOP',
+  title: 'Exchanges | Meguri',
   description: 'Exchange requests, supplier acceptance, atomic stock reservation and transfer confirmation.',
 };
 

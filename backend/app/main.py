@@ -43,7 +43,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             if settings.bootstrap_demo_password:
                 for name, email in await container.auth.ensure_demo_accounts(settings.bootstrap_demo_password):
                     logger.info("Demo login: %s -> %s", email, name)
-        logger.info("MONOLOOP API started (data backend: %s, auth: %s)", container.repos.backend, settings.auth_mode)
+        logger.info("Meguri API started (data backend: %s, auth: %s)", container.repos.backend, settings.auth_mode)
         yield
         await container.aclose()
 

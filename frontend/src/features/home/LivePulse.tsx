@@ -25,12 +25,8 @@ export function LivePulse() {
   return (
     <section aria-label="Live network figures" className="border-y border-graphite/10">
       <div className="page-shell flex flex-col gap-4 py-5 lg:flex-row lg:items-center lg:gap-10">
-        <p className="flex shrink-0 items-center gap-2 font-mono text-[11px] uppercase tracking-[0.08em] text-slate-600">
-          <span className={`inline-flex size-2 rounded-full ${allFailed ? 'bg-slate-400' : 'bg-copper'}`} aria-hidden />
-          Live on the network
-        </p>
         {allFailed ? (
-          <p className="text-sm text-slate-600">Live figures are unavailable right now — the MONOLOOP API could not be reached.</p>
+          <p className="text-sm text-slate-600">Live figures are unavailable right now — the Meguri API could not be reached.</p>
         ) : (
           <dl className="grid flex-1 grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4">
             {items.map((it) => (

@@ -1,7 +1,7 @@
 import { ChatPage } from '@/features/chat/components/ChatPage';
 
 export const metadata = {
-  title: 'Chat | MONOLOOP',
+  title: 'Chat | Meguri',
 };
 
 export default function ConversationPage({
