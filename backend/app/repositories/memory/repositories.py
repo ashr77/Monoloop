@@ -16,7 +16,7 @@ from app.repositories.base import (
 from app.repositories.memory import chat, workflow
 from app.repositories.memory.store import InMemoryStore
 from app.schemas.chat import ChatMessage, ConversationRecord
-from app.schemas.entities import Listing, Organization, Requirement, now_iso
+from app.schemas.entities import Listing, Organization, OrganizationRecord, Requirement, now_iso
 from app.schemas.exchange import ExchangeView, build_view
 
 
@@ -25,11 +25,47 @@ class MemoryOrganizationRepository:
         self.s = store
 
     async def list(self) -> list[Organization]:
-        return sorted((o.model_copy() for o in self.s.organizations.values()), key=lambda o: o.name)
+        orgs = (o.public() if isinstance(o, OrganizationRecord) else o.model_copy() for o in self.s.organizations.values())
+        return sorted(orgs, key=lambda o: o.name)
 
     async def get(self, organization_id: str) -> Organization | None:
         org = self.s.organizations.get(organization_id)
-        return org.model_copy() if org else None
+        return org.public() if isinstance(org, OrganizationRecord) else (org.model_copy() if org else None)
+
+    def _record(self, org: Organization) -> OrganizationRecord:
+        return OrganizationRecord.model_validate(org.model_dump())
+
+    async def create(self, data: dict) -> OrganizationRecord:
+        async with self.s.lock:
+            rec = OrganizationRecord.model_validate({"created_at": now_iso(), **data})
+            self.s.organizations[rec.id] = rec
+            return rec.model_copy()
+
+    async def get_record(self, organization_id: str) -> OrganizationRecord | None:
+        org = self.s.organizations.get(organization_id)
+        return self._record(org) if org else None
+
+    async def list_records(self, status: str | None = None) -> list[OrganizationRecord]:
+        rows = [self._record(o) for o in self.s.organizations.values() if status is None or o.status == status]
+        return sorted(rows, key=lambda o: o.created_at, reverse=True)
+
+    async def find_conflict(self, email: str, license_number: str) -> str | None:
+        for o in self.s.organizations.values():
+            if isinstance(o, OrganizationRecord):
+                if o.contact_email and o.contact_email.lower() == email.lower():
+                    return "email"
+                if o.license_number and o.license_number.lower() == license_number.lower():
+                    return "license"
+        return None
+
+    async def update(self, organization_id: str, changes: dict) -> OrganizationRecord | None:
+        async with self.s.lock:
+            org = self.s.organizations.get(organization_id)
+            if org is None:
+                return None
+            rec = OrganizationRecord.model_validate({**self._record(org).model_dump(), **changes})
+            self.s.organizations[organization_id] = rec
+            return rec.model_copy()
 
 
 class MemoryListingRepository:

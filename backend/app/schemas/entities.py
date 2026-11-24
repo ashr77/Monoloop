@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import re
 from datetime import UTC, datetime
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from pydantic import BeforeValidator, Field, StringConstraints
 
@@ -62,13 +62,32 @@ def now_iso() -> str:
     return _iso(datetime.now(UTC))
 
 
+OrganizationStatus = Literal["PENDING", "APPROVED", "REJECTED", "SUSPENDED"]
+
+
 class Organization(Entity):
+    """Public view of a company: safe to show to anyone (no licence, email or login)."""
+
     id: str
     name: str
     organization_type: OrganizationType
     city: str
     address: str | None = None
+    status: OrganizationStatus = "APPROVED"
     created_at: IsoTime = ""
+
+
+class OrganizationRecord(Organization):
+    """Full company record (migration 00009): only for the company itself and for admins."""
+
+    license_number: str | None = None
+    contact_email: str | None = None
+    auth_user_id: str | None = None
+    rejection_reason: str | None = None
+    reviewed_at: IsoTime | None = None
+
+    def public(self) -> Organization:
+        return Organization.model_validate(self.model_dump(include=set(Organization.model_fields)))
 
 
 class Listing(Entity):

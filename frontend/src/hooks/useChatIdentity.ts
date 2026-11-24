@@ -7,8 +7,10 @@ import { useCallback, useEffect, useState } from 'react';
 import type { Organization } from '@/lib/types';
 import { DEMO_ORGANIZATIONS } from '@/lib/constants';
 import { useOrganizations } from './useOrganizations';
+import { useIdentity } from '@/lib/auth/AuthProvider';
 
 const KEY = 'monoloop.chatOrganization';
+const noop = () => undefined;
 
 export function useChatIdentity() {
   const orgsQuery = useOrganizations();
@@ -23,6 +25,7 @@ export function useChatIdentity() {
     }
   }, []);
 
+  const identity = useIdentity();
   const organization = organizations.find((o) => o.id === stored) ?? organizations[0] ?? null;
   const setOrganization = useCallback((id: string) => {
     setStored(id);
@@ -33,5 +36,10 @@ export function useChatIdentity() {
     }
   }, []);
 
-  return { organization, organizations, setOrganization };
+  if (identity.locked) {
+    // Signed in: the company reads its own chats; there is nothing to switch.
+    const own = identity.organization as Organization | null;
+    return { organization: own, organizations: own ? [own] : [], setOrganization: noop, locked: true };
+  }
+  return { organization, organizations, setOrganization, locked: false };
 }

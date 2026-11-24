@@ -22,6 +22,7 @@ import { MaterialExtractionResult } from '@/lib/ai/schemas';
 import { useExtractMaterial, useSaveListing } from '@/hooks';
 import { errorMessage } from '@/lib/api/client';
 import { VoiceInputControl } from './VoiceInputControl';
+import { useIdentity } from '@/lib/auth/AuthProvider';
 
 const SUCCESS_MESSAGE_MS = 2500;
 
@@ -42,6 +43,7 @@ export function ListingFormModal({
   selectedOrgId,
   organizations,
 }: Props) {
+  const identity = useIdentity();
   const isEditing = Boolean(initialData);
   const saveListing = useSaveListing();
   const extractMaterial = useExtractMaterial();
@@ -385,13 +387,13 @@ export function ListingFormModal({
                 Supplier Organization (Demo Profile)
               </label>
               <select
-                disabled={isEditing}
+                disabled={isEditing || identity.locked}
                 value={organizationId}
                 onChange={(e) => setOrganizationId(e.target.value)}
                 className="w-full text-base p-3 rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
               >
                 {organizations
-                  .filter((o) => o.organization_type === 'SUPPLIER')
+                  .filter((o) => (identity.locked ? o.id === identity.organizationId : o.organization_type === 'SUPPLIER'))
                   .map((org) => (
                     <option key={org.id} value={org.id}>
                       {org.name} ({org.city})

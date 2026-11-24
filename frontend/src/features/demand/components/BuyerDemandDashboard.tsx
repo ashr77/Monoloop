@@ -12,9 +12,12 @@ import { RequirementFormModal } from './RequirementFormModal';
 import { useOrganizations, useRequirements, useMatch } from '@/hooks';
 import { errorMessage } from '@/lib/api/client';
 import { RequestExchangeButton } from '@/features/exchanges/components/RequestExchangeButton';
+import { useIdentity } from '@/lib/auth/AuthProvider';
 
 export function BuyerDemandDashboard() {
-  const [selectedOrgId, setSelectedOrgId] = useState('ALL');
+  const identity = useIdentity();
+  const [pickedOrgId, setSelectedOrgId] = useState('ALL');
+  const selectedOrgId = identity.locked ? identity.organizationId ?? 'ALL' : pickedOrgId;
   const [searchTerm, setSearchTerm] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<MaterialRequirement | null>(null);
@@ -102,6 +105,13 @@ export function BuyerDemandDashboard() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
+          {identity.locked ? (
+            identity.organization && (
+              <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-100 px-3 py-2 text-xs font-bold text-slate-800">
+                <Building2 className="h-4 w-4 text-slate-500" /> {identity.organization.name}
+              </div>
+            )
+          ) : (
           <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-100 p-1.5">
             <Building2 className="ml-1.5 h-4 w-4 text-slate-500" />
             <select
@@ -119,6 +129,7 @@ export function BuyerDemandDashboard() {
                 ))}
             </select>
           </div>
+          )}
           <button
             type="button"
             onClick={openCreate}

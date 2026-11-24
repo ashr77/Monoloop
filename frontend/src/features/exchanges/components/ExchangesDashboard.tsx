@@ -8,6 +8,7 @@
 
 import Link from 'next/link';
 import { requirementSize } from '@/lib/dimensions';
+import { useIdentity } from '@/lib/auth/AuthProvider';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import {
@@ -57,7 +58,9 @@ interface Toast {
 export function ExchangesDashboard() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const actingAs = searchParams.get('as') ?? 'ALL';
+  const identity = useIdentity();
+  // Signed in: always the company itself (admins: everything, read-only). Demo: the ?as= switcher.
+  const actingAs = identity.locked ? identity.organizationId ?? 'ALL' : searchParams.get('as') ?? 'ALL';
   const highlight = searchParams.get('highlight');
 
   const [filter, setFilter] = useState<Filter>('ACTIVE');
@@ -205,6 +208,12 @@ export function ExchangesDashboard() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
+          {identity.locked ? (
+            <span className="flex items-center gap-2 bg-slate-100 px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-800">
+              <Building2 className="w-4 h-4 text-slate-500" />
+              {identity.organization?.name ?? 'Admin · all exchanges (read-only)'}
+            </span>
+          ) : (
           <label className="flex items-center gap-2 bg-slate-100 p-1.5 rounded-xl border border-slate-200">
             <Building2 className="w-4 h-4 text-slate-500 ml-1.5" />
             <span className="sr-only">Acting as</span>
@@ -221,6 +230,7 @@ export function ExchangesDashboard() {
               ))}
             </select>
           </label>
+          )}
           <button
             onClick={load}
             disabled={loading}
@@ -241,7 +251,7 @@ export function ExchangesDashboard() {
             reserved in a single database transaction when each supplier accepts, so the same pieces can never be promised
             twice. Cancelling releases reservations; completing deducts inventory exactly once.
           </p>
-          {actingAs === 'ALL' && (
+          {actingAs === 'ALL' && !identity.locked && (
             <p className="font-semibold">Choose an organization in &ldquo;Acting as&rdquo; to accept, decline, complete or cancel.</p>
           )}
         </div>
@@ -314,7 +324,7 @@ export function ExchangesDashboard() {
               busy={busy}
               onAct={act}
               onPay={pay}
-              onSwitch={setActingAs}
+              onSwitch={identity.locked ? undefined : setActingAs}
               orgName={orgName}
             />
           ))}
@@ -374,7 +384,8 @@ interface CardProps {
   busy: string | null;
   onAct: (ex: ExchangeView, action: ExchangeAction, itemId?: string) => void;
   onPay: (ex: ExchangeView) => void;
-  onSwitch: (orgId: string) => void;
+  /** Demo only: jump to another organization's view. Absent when signed in. */
+  onSwitch?: (orgId: string) => void;
   orgName: (id: string) => string;
 }
 
@@ -505,7 +516,7 @@ function ExchangeCard({ ex, actingAs, highlighted, busy, onAct, onPay, onSwitch,
                           Decline
                         </button>
                       </div>
-                    ) : canRespond ? (
+                    ) : canRespond && onSwitch ? (
                       <button
                         onClick={() => onSwitch(item.supplier_organization_id)}
                         className="text-xs font-semibold text-emerald-700 hover:underline"
@@ -571,7 +582,7 @@ function ExchangeCard({ ex, actingAs, highlighted, busy, onAct, onPay, onSwitch,
                 Confirm transfer
               </button>
             </div>
-          ) : (
+          ) : onSwitch ? (
             <button
               onClick={() => onSwitch(ex.buyer_organization_id)}
               className="text-xs font-semibold text-emerald-700 hover:underline self-start sm:self-auto"
@@ -579,7 +590,7 @@ function ExchangeCard({ ex, actingAs, highlighted, busy, onAct, onPay, onSwitch,
             >
               Act as buyer →
             </button>
-          )}
+          ) : null}
         </div>
       )}
 

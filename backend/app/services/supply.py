@@ -14,7 +14,8 @@ class OrganizationService:
         self.repos = repos
 
     async def list(self) -> list[Organization]:
-        return await self.repos.organizations.list()
+        # Public directory: approved companies only (pending applicants stay private).
+        return [o for o in await self.repos.organizations.list() if o.status == "APPROVED"]
 
 
 class ListingService:

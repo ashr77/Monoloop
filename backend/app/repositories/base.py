@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from typing import Literal, Protocol
 
 from app.schemas.chat import ChatMessage, ConversationRecord
-from app.schemas.entities import Listing, Organization, Requirement
+from app.schemas.entities import Listing, Organization, OrganizationRecord, Requirement
 from app.schemas.exchange import ExchangeView
 from app.schemas.payment import PaymentRecord
 
@@ -57,6 +57,14 @@ class NewExchangeItem:
 class OrganizationRepository(Protocol):
     async def list(self) -> list[Organization]: ...
     async def get(self, organization_id: str) -> Organization | None: ...
+    # Company accounts (migration 00009): full records incl. licence/email, admin + owner only.
+    async def create(self, data: dict) -> OrganizationRecord: ...
+    async def get_record(self, organization_id: str) -> OrganizationRecord | None: ...
+    async def list_records(self, status: str | None = None) -> list[OrganizationRecord]: ...
+    async def find_conflict(self, email: str, license_number: str) -> str | None:
+        """'email' or 'license' if another company already uses it (case-insensitive)."""
+        ...
+    async def update(self, organization_id: str, changes: dict) -> OrganizationRecord | None: ...
 
 
 class ListingRepository(Protocol):

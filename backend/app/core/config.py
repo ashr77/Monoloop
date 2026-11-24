@@ -37,6 +37,12 @@ class Settings(BaseSettings):
     # "demo": acting organization comes from the X-Organization-Id header (demo org switcher).
     # "jwt":  a Supabase access token is required; the organization comes from its app_metadata.
     auth_mode: Literal["demo", "jwt"] = "demo"
+    # Offline demo only (no Supabase configured): create this admin at startup in the in-process
+    # login provider. For Supabase use `python -m app.scripts.create_admin` once instead.
+    bootstrap_admin_email: str = ""
+    bootstrap_admin_password: str = ""
+    # Offline demo only: give every seeded company a login <name>@monoloop.demo with this password.
+    bootstrap_demo_password: str = ""
     supabase_jwks_url: str = ""
     jwt_audience: str = "authenticated"
 

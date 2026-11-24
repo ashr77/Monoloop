@@ -27,6 +27,8 @@ from app.repositories.memory.repositories import (
 from app.repositories.memory.store import InMemoryStore
 from app.services.ai.extraction import ExtractionService
 from app.services.ai.transcription import TranscriptionService
+from app.services.auth.provider import AuthProvider, LocalAuthProvider, SupabaseAuthProvider
+from app.services.auth.service import AuthService
 from app.services.chat import ChatService
 from app.services.demand import RequirementService
 from app.services.exchange import ExchangeService
@@ -56,6 +58,7 @@ class Container:
         self.impact = ImpactService(self.repos)
         self.chat = ChatService(self.repos)
         self.extraction = ExtractionService(self.settings, self.http)
+        self.auth = AuthService(self.repos, build_auth_provider(self.settings, self.http))
         self.transcription = TranscriptionService(self.settings, self.http)
 
     async def aclose(self) -> None:
@@ -64,6 +67,14 @@ class Container:
             await self.rest.aclose()
         if self.engine is not None:
             await self.engine.dispose()
+
+
+def build_auth_provider(settings: Settings, http: httpx.AsyncClient) -> AuthProvider:
+    """Supabase Auth when the project is configured, otherwise in-process accounts (tests, offline demo)."""
+    if settings.supabase_rest_configured:
+        return SupabaseAuthProvider(http, settings.supabase_url, settings.supabase_service_role_key,
+                                    settings.supabase_jwks_url, settings.jwt_audience)
+    return LocalAuthProvider()
 
 
 def build_gateway(settings: Settings, http: httpx.AsyncClient) -> PaymentGateway | None:

@@ -13,7 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 
 from app.api.deps import build_container
-from app.api.routes import chat, demand, exchange, matching, payment, supply, system
+from app.api.routes import admin, auth, chat, demand, exchange, matching, payment, supply, system
 from app.core.config import Settings, get_settings
 from app.core.errors import register_exception_handlers
 from app.core.middleware import (
@@ -34,6 +34,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def lifespan(app: FastAPI):
         container = build_container(settings)
         app.state.container = container
+        if container.auth.provider.name == "local":  # offline demo logins (never used with Supabase)
+            if settings.bootstrap_admin_email:
+                await container.auth.create_admin(settings.bootstrap_admin_email, settings.bootstrap_admin_password)
+            if settings.bootstrap_demo_password:
+                for name, email in await container.auth.ensure_demo_accounts(settings.bootstrap_demo_password):
+                    logger.info("Demo login: %s -> %s", email, name)
         logger.info("MONOLOOP API started (data backend: %s, auth: %s)", container.repos.backend, settings.auth_mode)
         yield
         await container.aclose()
@@ -51,7 +57,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         openapi_url=None if is_prod else "/openapi.json",
     )
     register_exception_handlers(app)
-    for module in (system, supply, demand, matching, exchange, payment, chat):
+    for module in (system, auth, admin, supply, demand, matching, exchange, payment, chat):
         app.include_router(module.router)
 
     # Added innermost first; the last one added runs first on each request.

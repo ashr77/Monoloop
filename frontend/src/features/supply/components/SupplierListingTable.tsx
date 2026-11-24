@@ -27,6 +27,8 @@ interface Props {
   organizations?: import('@/lib/types').Organization[];
   buyerOrganizationId?: string;
   onBuyerOrganizationChange?: (organizationId: string) => void;
+  /** Signed-in company: always orders and chats as itself, so no picker. */
+  buyerLocked?: boolean;
 }
 
 export function SupplierListingTable({
@@ -36,6 +38,7 @@ export function SupplierListingTable({
   organizations = [],
   buyerOrganizationId,
   onBuyerOrganizationChange,
+  buyerLocked,
 }: Props) {
   const saveListing = useSaveListing();
   const [searchTerm, setSearchTerm] = useState('');
@@ -142,7 +145,7 @@ export function SupplierListingTable({
 
         {/* Filters */}
         <div className="flex flex-wrap items-center gap-2">
-          {organizations.length > 0 && (
+          {organizations.length > 0 && !buyerLocked && (
             <select
               ref={buyerPicker}
               value={buyerOrganizationId || ''}
@@ -322,7 +325,7 @@ export function SupplierListingTable({
                     {/* Actions */}
                     <td className="py-3.5 px-4 text-right">
                       <div className="flex items-center justify-end gap-1.5">
-                        {item.status === 'ACTIVE' && organizations.length > 0 && (
+                        {item.status === 'ACTIVE' && organizations.length > 0 && !(buyerLocked && item.organization_id === buyerOrganizationId) && (
                           <button
                             type="button"
                             onClick={() => startChat(item)}
@@ -338,7 +341,7 @@ export function SupplierListingTable({
                             Chat
                           </button>
                         )}
-                        {item.status === 'ACTIVE' && item.available_quantity > 0 && (
+                        {item.status === 'ACTIVE' && item.available_quantity > 0 && !(buyerLocked && item.organization_id === buyerOrganizationId) && (
                           <button
                             type="button"
                             onClick={() => openOrder(item)}

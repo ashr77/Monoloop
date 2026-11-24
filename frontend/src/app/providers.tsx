@@ -4,6 +4,7 @@
 // One client per browser tab; a new one per server render.
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
+import { AuthProvider } from '@/lib/auth/AuthProvider';
 
 function makeQueryClient() {
   return new QueryClient({
@@ -28,5 +29,9 @@ function getQueryClient() {
 }
 
 export function Providers({ children }: { children: ReactNode }) {
-  return <QueryClientProvider client={getQueryClient()}>{children}</QueryClientProvider>;
+  return (
+    <QueryClientProvider client={getQueryClient()}>
+      <AuthProvider>{children}</AuthProvider>
+    </QueryClientProvider>
+  );
 }

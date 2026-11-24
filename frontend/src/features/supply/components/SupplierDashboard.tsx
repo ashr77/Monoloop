@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { MaterialListing, Organization } from '@/lib/types';
 import { DEMO_ORGANIZATIONS } from '@/lib/constants';
+import { useIdentity } from '@/lib/auth/AuthProvider';
 import { SupplierStatsCards } from './SupplierStatsCards';
 import { SupplierListingTable } from './SupplierListingTable';
 import { ListingFormModal } from './ListingFormModal';
@@ -17,11 +18,17 @@ import { useListings, useOrganizations } from '@/hooks';
 import { errorMessage } from '@/lib/api/client';
 
 export function SupplierDashboard() {
-  const [selectedOrgId, setSelectedOrgId] = useState<string>('ALL');
+  const identity = useIdentity();
+  const [pickedOrgId, setSelectedOrgId] = useState<string>('ALL');
+  // Signed in (AUTH_MODE=jwt): the company's own listings by default, or the whole marketplace.
+  const [scope, setScope] = useState<'MINE' | 'ALL'>('MINE');
+  const ownOrgId = identity.locked ? identity.organizationId : null;
+  const selectedOrgId = identity.locked ? (scope === 'MINE' && ownOrgId ? ownOrgId : 'ALL') : pickedOrgId;
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingListing, setEditingListing] = useState<MaterialListing | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [buyerOrganizationId, setBuyerOrganizationId] = useState('');
+  const [pickedBuyerId, setBuyerOrganizationId] = useState('');
+  const buyerOrganizationId = ownOrgId ?? pickedBuyerId; // a signed-in company always orders as itself
 
   // Data comes from the FastAPI backend through cached hooks (src/hooks).
   const orgsQuery = useOrganizations();
@@ -87,6 +94,20 @@ export function SupplierDashboard() {
 
         {/* Demo Organization Switcher & Create Action */}
         <div className="flex flex-wrap items-center gap-3">
+          {identity.locked ? (
+            <div className="flex items-center gap-2 bg-slate-100 p-1.5 rounded-xl border border-slate-200">
+              <Building2 className="w-4 h-4 text-slate-500 ml-1.5" />
+              <select
+                value={ownOrgId ? scope : 'ALL'}
+                onChange={(e) => setScope(e.target.value as 'MINE' | 'ALL')}
+                className="bg-transparent text-xs font-bold text-slate-800 focus:outline-none cursor-pointer pr-2"
+                aria-label="Which listings to show"
+              >
+                {ownOrgId && <option value="MINE">My listings · {identity.organization?.name}</option>}
+                <option value="ALL">All companies (marketplace)</option>
+              </select>
+            </div>
+          ) : (
           <div className="flex items-center gap-2 bg-slate-100 p-1.5 rounded-xl border border-slate-200">
             <Building2 className="w-4 h-4 text-slate-500 ml-1.5" />
             <select
@@ -102,7 +123,9 @@ export function SupplierDashboard() {
               ))}
             </select>
           </div>
+          )}
 
+          {!identity.isAdmin && (
           <button
             onClick={handleOpenCreate}
             className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm shadow-sm transition"
@@ -110,6 +133,7 @@ export function SupplierDashboard() {
             <Plus className="w-4 h-4" />
             <span>+ Create Surplus Listing</span>
           </button>
+          )}
         </div>
       </div>
 
@@ -166,6 +190,7 @@ export function SupplierDashboard() {
             organizations={organizations}
             buyerOrganizationId={buyerOrganizationId}
             onBuyerOrganizationChange={setBuyerOrganizationId}
+            buyerLocked={identity.locked}
           />
         )}
       </div>
@@ -176,7 +201,7 @@ export function SupplierDashboard() {
         onClose={() => setIsModalOpen(false)}
         onSuccess={handleModalSuccess}
         initialData={editingListing}
-        selectedOrgId={selectedOrgId !== 'ALL' ? selectedOrgId : undefined}
+        selectedOrgId={ownOrgId ?? (selectedOrgId !== 'ALL' ? selectedOrgId : undefined)}
         organizations={organizations}
       />
     </div>

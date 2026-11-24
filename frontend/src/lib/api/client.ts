@@ -9,6 +9,7 @@
 // ============================================================================
 
 import type { ApiResponse } from '@/lib/types';
+import { getSession, setSession, type AuthSession } from '@/lib/auth/session';
 
 export const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/+$/, '');
 
@@ -61,10 +62,50 @@ function withTimeout(signal: AbortSignal | undefined, ms: number): AbortSignal {
   return signal ? AbortSignal.any([signal, timeout]) : timeout;
 }
 
+// Signed-in sessions: refresh shortly before expiry, at most one refresh in flight.
+let refreshing: Promise<AuthSession | null> | null = null;
+
+async function refreshSession(session: AuthSession): Promise<AuthSession | null> {
+  if (!refreshing) {
+    refreshing = fetch(buildUrl('/api/auth/refresh'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ refresh_token: session.refresh_token }),
+      cache: 'no-store',
+    })
+      .then(async (r) => {
+        const payload = (await r.json().catch(() => null)) as ApiResponse<AuthSession> | null;
+        const next = payload?.success && payload.data ? payload.data : null;
+        setSession(next); // null = expired: the UI sends the user to /login
+        return next;
+      })
+      .catch(() => session) // offline: keep the old one and let the request fail normally
+      .finally(() => {
+        refreshing = null;
+      });
+  }
+  return refreshing;
+}
+
+async function currentSession(): Promise<AuthSession | null> {
+  const session = getSession();
+  if (session && session.expires_at - 60 < Date.now() / 1000) return refreshSession(session);
+  return session;
+}
+
 export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<ApiResult<T>> {
-  const { method = 'GET', query, body, organizationId, signal, timeoutMs = DEFAULT_TIMEOUT_MS } = options;
+  const { method = 'GET', query, body, signal, timeoutMs = DEFAULT_TIMEOUT_MS } = options;
+  let { organizationId } = options;
   const headers: Record<string, string> = { Accept: 'application/json' };
   if (body !== undefined) headers['Content-Type'] = 'application/json';
+  // Login, signup and refresh are the only calls made without a session.
+  const anonymous = ['/api/auth/login', '/api/auth/signup', '/api/auth/refresh'].includes(path);
+  const session = anonymous ? null : await currentSession();
+  if (session) {
+    headers.Authorization = `Bearer ${session.access_token}`;
+    // A signed-in company always acts as itself; admins act for no company.
+    organizationId = session.profile.organization?.id ?? null;
+  }
   if (organizationId) headers['X-Organization-Id'] = organizationId;
 
   let response: Response;

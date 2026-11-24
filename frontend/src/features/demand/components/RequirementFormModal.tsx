@@ -9,6 +9,7 @@ import { isDemandSpecificationValid } from '@/features/demand/validation';
 import { useExtractRequirement, useSaveRequirement } from '@/hooks';
 import { errorMessage } from '@/lib/api/client';
 import { RequirementExtractionResult } from '@/lib/ai/schemas';
+import { useIdentity } from '@/lib/auth/AuthProvider';
 
 interface Props {
   isOpen: boolean;
@@ -27,6 +28,7 @@ export function RequirementFormModal({
   organizations,
   selectedOrgId,
 }: Props) {
+  const identity = useIdentity();
   const saveRequirement = useSaveRequirement();
   const extractRequirement = useExtractRequirement();
   const buyers = organizations.filter(
@@ -288,9 +290,9 @@ export function RequirementFormModal({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <label className="text-sm font-medium text-slate-700">
               Buyer organization
-              <select value={organizationId} onChange={(event) => setOrganizationId(event.target.value)} className={`${fieldClass} mt-1`}>
+              <select value={organizationId} disabled={identity.locked} onChange={(event) => setOrganizationId(event.target.value)} className={`${fieldClass} mt-1`}>
                 <option value="">Select buyer</option>
-                {buyers.map((organization) => (
+                {buyers.filter((o) => !identity.locked || o.id === identity.organizationId).map((organization) => (
                   <option key={organization.id} value={organization.id}>{organization.name}</option>
                 ))}
               </select>
