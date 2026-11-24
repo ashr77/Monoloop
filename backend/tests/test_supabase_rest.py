@@ -171,3 +171,59 @@ async def test_exchange_list_for_org_includes_supplied_exchanges():
     async with fake_client(handler) as client:
         assert await SupabaseExchangeRepository(client).list(ExchangeFilter(organization_id=SUP_GAZIPUR)) == []
     assert seen["exchanges"].url.params["or"] == f"(buyer_organization_id.eq.{SUP_GAZIPUR},id.in.({EX}))"
+
+
+# --- buyer ↔ supplier chat ----------------------------------------------------------------
+
+CONV = "d0000000-0000-4000-8000-0000000000c1"
+
+
+async def test_chat_writes_are_single_rpc_calls():
+    from app.repositories.supabase.repositories import SupabaseChatRepository
+
+    calls = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append((request.url.path, json.loads(request.content)))
+        return httpx.Response(200, json="11111111-1111-4111-8111-111111111111")
+
+    repo = SupabaseChatRepository(fake_client(handler))
+    await repo.open_conversation(LISTING, BUYER_APEX)
+    await repo.post_message(CONV, BUYER_APEX, "hi")
+    await repo.mark_read(CONV, SUP_GAZIPUR)
+    assert calls == [
+        ("/rest/v1/rpc/open_listing_conversation", {"p_listing_id": LISTING, "p_buyer_id": BUYER_APEX}),
+        ("/rest/v1/rpc/post_listing_message", {"p_conversation_id": CONV, "p_actor_id": BUYER_APEX, "p_body": "hi"}),
+        ("/rest/v1/rpc/mark_listing_conversation_read", {"p_conversation_id": CONV, "p_actor_id": SUP_GAZIPUR}),
+    ]
+
+
+async def test_chat_reads_filter_by_participant_and_cursor():
+    from app.repositories.supabase.repositories import SupabaseChatRepository
+
+    seen = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append((request.url.path, dict(request.url.params)))
+        return httpx.Response(200, json=[])
+
+    repo = SupabaseChatRepository(fake_client(handler))
+    await repo.list_conversations(BUYER_APEX)
+    await repo.messages(CONV, 41, 200)
+    assert seen[0][0] == "/rest/v1/listing_conversations"
+    assert seen[0][1]["or"] == f"(buyer_organization_id.eq.{BUYER_APEX},supplier_organization_id.eq.{BUYER_APEX})"
+    assert seen[1][0] == "/rest/v1/listing_messages"
+    assert (seen[1][1]["seq"], seen[1][1]["order"], seen[1][1]["limit"]) == ("gt.41", "seq.asc", "200")
+    # Non-UUID ids never reach the database.
+    assert await repo.list_conversations("x),or=(1.eq.1") == [] and await repo.get_conversation("nope") is None
+    with pytest.raises(AppError) as err:
+        await repo.post_message("not-a-uuid", BUYER_APEX, "hi")
+    assert err.value.code == "NOT_FOUND" and len(seen) == 2
+
+
+def test_missing_migration_is_reported_clearly():
+    e = translate_rest_error(_resp(404, {"code": "PGRST202", "message": "Could not find the function "
+                                                                        "public.open_listing_conversation"}))
+    assert (e.code, e.status) == ("SERVICE_UNAVAILABLE", 503)
+    assert "missing a migration" in str(e) and "open_listing_conversation" not in str(e)
+    assert translate_rest_error(_resp(404, {"code": "PGRST205", "message": "table"})).code == "SERVICE_UNAVAILABLE"

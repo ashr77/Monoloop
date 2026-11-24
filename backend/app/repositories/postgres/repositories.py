@@ -29,6 +29,7 @@ from app.repositories.base import (
     RequirementFilter,
 )
 from app.repositories.postgres.tables import listings, organizations, requirements
+from app.schemas.chat import ChatMessage, ConversationRecord
 from app.schemas.entities import (
     ActivityLog,
     ExchangeItemRecord,
@@ -339,3 +340,69 @@ class PgExchangeRepository:
                 await conn.execute(text(_ACTIONS[action]), {"item": item_id, "exchange": exchange_id, "actor": actor_id})
         except DBAPIError as exc:
             raise translate_db_error(exc) from exc
+
+
+class PgChatRepository:
+    """Buyer ↔ supplier chat. Every write is one call to a migration-00007 function."""
+
+    def __init__(self, engine: AsyncEngine):
+        self.engine = engine
+
+    async def _call(self, sql: str, params: dict[str, Any]) -> Any:
+        try:
+            async with self.engine.begin() as conn:
+                result = await conn.execute(text(sql), params)
+                return result.scalar() if result.returns_rows else None
+        except DBAPIError as exc:
+            raise translate_db_error(exc) from exc
+
+    async def _rows(self, sql: str, params: dict[str, Any]) -> list[dict]:
+        async with self.engine.connect() as conn:
+            rows = await conn.execute(text(sql), params)
+            return [{k: (str(v) if isinstance(v, uuid.UUID) else v) for k, v in r._mapping.items()} for r in rows]
+
+    @staticmethod
+    def _require_uuid(value: str, what: str) -> None:
+        if not is_uuid(value):
+            raise AppError("NOT_FOUND", f"{what} {value} was not found.")
+
+    async def open_conversation(self, listing_id: str, buyer_id: str) -> str:
+        self._require_uuid(listing_id, "Listing")
+        return str(await self._call("SELECT open_listing_conversation(CAST(:l AS uuid), CAST(:b AS uuid))",
+                                    {"l": listing_id, "b": buyer_id}))
+
+    async def get_conversation(self, conversation_id: str) -> ConversationRecord | None:
+        if not is_uuid(conversation_id):
+            return None
+        rows = await self._rows("SELECT * FROM listing_conversations WHERE id = CAST(:id AS uuid)", {"id": conversation_id})
+        return ConversationRecord.model_validate(rows[0]) if rows else None
+
+    async def list_conversations(self, organization_id: str) -> list[ConversationRecord]:
+        if not is_uuid(organization_id):
+            return []
+        rows = await self._rows(
+            "SELECT * FROM listing_conversations WHERE buyer_organization_id = CAST(:o AS uuid) "
+            "OR supplier_organization_id = CAST(:o AS uuid) ORDER BY last_message_at DESC LIMIT 200",
+            {"o": organization_id},
+        )
+        return [ConversationRecord.model_validate(r) for r in rows]
+
+    async def messages(self, conversation_id: str, after_seq: int, limit: int) -> list[ChatMessage]:
+        if not is_uuid(conversation_id):
+            return []
+        rows = await self._rows(
+            "SELECT * FROM listing_messages WHERE conversation_id = CAST(:c AS uuid) AND seq > :after "
+            "ORDER BY seq LIMIT :limit",
+            {"c": conversation_id, "after": after_seq, "limit": limit},
+        )
+        return [ChatMessage.model_validate(r) for r in rows]
+
+    async def post_message(self, conversation_id: str, actor_id: str, body: str) -> str:
+        self._require_uuid(conversation_id, "Conversation")
+        return str(await self._call("SELECT post_listing_message(CAST(:c AS uuid), CAST(:a AS uuid), :body)",
+                                    {"c": conversation_id, "a": actor_id, "body": body}))
+
+    async def mark_read(self, conversation_id: str, actor_id: str) -> None:
+        self._require_uuid(conversation_id, "Conversation")
+        await self._call("SELECT mark_listing_conversation_read(CAST(:c AS uuid), CAST(:a AS uuid))",
+                         {"c": conversation_id, "a": actor_id})

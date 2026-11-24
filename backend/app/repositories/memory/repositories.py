@@ -13,8 +13,9 @@ from app.repositories.base import (
     NewExchangeItem,
     RequirementFilter,
 )
-from app.repositories.memory import workflow
+from app.repositories.memory import chat, workflow
 from app.repositories.memory.store import InMemoryStore
+from app.schemas.chat import ChatMessage, ConversationRecord
 from app.schemas.entities import Listing, Organization, Requirement, now_iso
 from app.schemas.exchange import ExchangeView, build_view
 
@@ -178,3 +179,33 @@ class MemoryExchangeRepository:
                 workflow.complete_exchange(self.s, exchange_id, actor_id)
             else:
                 workflow.cancel_exchange(self.s, exchange_id, actor_id)
+
+
+class MemoryChatRepository:
+    def __init__(self, store: InMemoryStore):
+        self.s = store
+
+    async def open_conversation(self, listing_id: str, buyer_id: str) -> str:
+        async with self.s.lock:
+            return chat.open_conversation(self.s, listing_id, buyer_id)
+
+    async def get_conversation(self, conversation_id: str) -> ConversationRecord | None:
+        conv = self.s.conversations.get(conversation_id)
+        return conv.model_copy() if conv else None
+
+    async def list_conversations(self, organization_id: str) -> list[ConversationRecord]:
+        convs = [c.model_copy() for c in self.s.conversations.values()
+                 if organization_id in (c.buyer_organization_id, c.supplier_organization_id)]
+        return sorted(convs, key=lambda c: c.last_message_at, reverse=True)
+
+    async def messages(self, conversation_id: str, after_seq: int, limit: int) -> list[ChatMessage]:
+        out = [m for m in self.s.chat_messages if m.conversation_id == conversation_id and m.seq > after_seq]
+        return [m.model_copy() for m in out[:limit]]
+
+    async def post_message(self, conversation_id: str, actor_id: str, body: str) -> str:
+        async with self.s.lock:
+            return chat.post_message(self.s, conversation_id, actor_id, body)
+
+    async def mark_read(self, conversation_id: str, actor_id: str) -> None:
+        async with self.s.lock:
+            chat.mark_read(self.s, conversation_id, actor_id)

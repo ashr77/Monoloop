@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from app.core.config import Settings
 from app.repositories.base import Repositories
 from app.repositories.memory.repositories import (
+    MemoryChatRepository,
     MemoryExchangeRepository,
     MemoryListingRepository,
     MemoryOrganizationRepository,
@@ -25,6 +26,7 @@ from app.repositories.memory.repositories import (
 from app.repositories.memory.store import InMemoryStore
 from app.services.ai.extraction import ExtractionService
 from app.services.ai.transcription import TranscriptionService
+from app.services.chat import ChatService
 from app.services.demand import RequirementService
 from app.services.exchange import ExchangeService
 from app.services.impact import ImpactService
@@ -48,6 +50,7 @@ class Container:
         self.matching = MatchingService(self.repos)
         self.exchanges = ExchangeService(self.repos, self.matching)
         self.impact = ImpactService(self.repos)
+        self.chat = ChatService(self.repos)
         self.extraction = ExtractionService(self.settings, self.http)
         self.transcription = TranscriptionService(self.settings, self.http)
 
@@ -65,12 +68,14 @@ def memory_repositories(store: InMemoryStore) -> Repositories:
         listings=MemoryListingRepository(store),
         requirements=MemoryRequirementRepository(store),
         exchanges=MemoryExchangeRepository(store),
+        chat=MemoryChatRepository(store),
         backend="memory",
     )
 
 
 def postgres_repositories(engine: AsyncEngine) -> Repositories:
     from app.repositories.postgres.repositories import (
+        PgChatRepository,
         PgExchangeRepository,
         PgListingRepository,
         PgOrganizationRepository,
@@ -82,12 +87,14 @@ def postgres_repositories(engine: AsyncEngine) -> Repositories:
         listings=PgListingRepository(engine),
         requirements=PgRequirementRepository(engine),
         exchanges=PgExchangeRepository(engine),
+        chat=PgChatRepository(engine),
         backend="postgres",
     )
 
 
 def supabase_repositories(rest: httpx.AsyncClient) -> Repositories:
     from app.repositories.supabase.repositories import (
+        SupabaseChatRepository,
         SupabaseExchangeRepository,
         SupabaseListingRepository,
         SupabaseOrganizationRepository,
@@ -99,6 +106,7 @@ def supabase_repositories(rest: httpx.AsyncClient) -> Repositories:
         listings=SupabaseListingRepository(rest),
         requirements=SupabaseRequirementRepository(rest),
         exchanges=SupabaseExchangeRepository(rest),
+        chat=SupabaseChatRepository(rest),
         backend="supabase",
     )
 

@@ -6,7 +6,7 @@ Every API endpoint of MONOLOOP: supply, demand, explainable matching, exchanges 
 python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
 cp .env.example .env
 .venv/bin/uvicorn app.main:app --reload --port 8000     # interactive docs: http://localhost:8000/docs
-.venv/bin/pytest                                         # 85 tests (+1 opt-in live test)
+.venv/bin/pytest                                         # 106 tests (+15 opt-in: live Supabase, chat rules on PostgreSQL)
 .venv/bin/ruff check app tests
 ```
 
@@ -22,7 +22,7 @@ With `DATA_BACKEND=auto`: Postgres if `DATABASE_URL` is set, otherwise Supabase 
 
 Live check of the `supabase` backend (writes one CANCELLED exchange, leaves stock unchanged): `MONOLOOP_LIVE_SUPABASE=1 .venv/bin/pytest tests/test_supabase_live.py`
 
-Apply `../supabase/migrations/00001` → `00004` first. The schema lives only in those migrations; `app/repositories/postgres/tables.py` describes it and never alters it. `GET /api/health` reports the active backend and whether the database answers.
+Apply `../supabase/migrations/00001` → `00007` first. The schema lives only in those migrations; `app/repositories/postgres/tables.py` describes it and never alters it. `GET /api/health` reports the active backend and whether the database answers.
 
 ## Architecture
 
@@ -80,6 +80,9 @@ Every response uses the envelope `{ "success", "data", "error": { "code", "messa
 | POST | `/api/exchanges/{id}/accept` · `/reject` | M4 | item's supplier; body `{exchange_item_id}` |
 | POST | `/api/exchanges/{id}/complete` · `/cancel` | M4 | buyer only |
 | GET | `/api/impact` | M4 | only COMPLETED exchanges count as reuse |
+| GET / POST | `/api/conversations` | M1 | buyer ↔ supplier chat: the org's chats (`meta.unread_total`) / a buyer opens the chat for `{listing_id}` |
+| GET | `/api/conversations/{id}?after_seq=` | M1 | participants only; messages after the polling cursor |
+| POST | `/api/conversations/{id}/messages` · `/read` | M1 | `{body}` 1–2000 chars; clear your unread count |
 | POST | `/api/ai/extract-material` | M1 | `{prompt, mock?}`; provider failure → `success:false`, `AI_UNAVAILABLE` |
 | POST | `/api/ai/transcribe` | M1 | `{audio_base64, mime_type, language: en-US\|bn-BD\|ja-JP}`; voice fallback for browsers without the Web Speech API; own body limit (`MAX_AUDIO_BYTES`); failure → `AI_UNAVAILABLE` |
 
@@ -116,5 +119,6 @@ Every response uses the envelope `{ "success", "data", "error": { "code", "messa
 | `test_engine_parity.py` | the Python engine reproduces the original TypeScript engine output on all 18 recorded cases |
 | `test_matching_engine.py` | plan tests T4–T8, rotation, own listings, budgets, optimality against brute force (300 random cases), greedy fallback, evaluation metrics |
 | `test_api.py` | T1–T3, T9, every endpoint, the full 50 + 30 exchange flow (stock deducted, requirement FULFILLED, impact), reject/cancel releases stock |
+| `test_chat.py` | chat story, polling cursor, inbox/unread, participants only, who may open, never touches stock (memory + optional PostgreSQL) |
 | `test_voice.py` | Bangla/Japanese mock extraction, transcription soft failures, strict input, per-route audio body limit |
 | `test_security.py` | headers, CORS, rate limit, body limit, UUID identity, injection, error hygiene, JWT mode, production docs |

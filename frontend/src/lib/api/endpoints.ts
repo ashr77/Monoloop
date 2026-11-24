@@ -7,6 +7,7 @@ import type { MaterialListing, MaterialRequirement, Organization } from '@/lib/t
 import type { MatchResult } from '@/features/matching/types';
 import type { ExchangeAction, ExchangeView } from '@/features/exchanges/types';
 import type { ImpactReport } from '@/features/analytics/impact';
+import type { ConversationSummary, ConversationView } from '@/features/chat/types';
 import type { MaterialExtractionResult, RequirementExtractionResult, SpeechLanguage } from '@/lib/ai/schemas';
 import { apiRequest } from './client';
 
@@ -132,6 +133,39 @@ export const api = {
   impact: {
     get: (organizationId?: string | null, signal?: AbortSignal) =>
       apiRequest<ImpactReport>('/api/impact', { query: { organization_id: organizationId }, signal }).then((r) => r.data),
+  },
+
+  /** Buyer ↔ supplier chat about a listing (participants only). */
+  chat: {
+    list: (organizationId: string, signal?: AbortSignal) =>
+      apiRequest<ConversationSummary[]>('/api/conversations', { organizationId, signal }).then((r) => ({
+        items: r.data,
+        unreadTotal: Number((r.meta as { unread_total?: number } | undefined)?.unread_total ?? 0),
+      })),
+    open: (listingId: string, buyerOrganizationId: string) =>
+      apiRequest<ConversationView>('/api/conversations', {
+        method: 'POST',
+        body: { listing_id: listingId },
+        organizationId: buyerOrganizationId,
+      }).then((r) => r.data),
+    get: (conversationId: string, organizationId: string, afterSeq = 0, signal?: AbortSignal) =>
+      apiRequest<ConversationView>(`/api/conversations/${enc(conversationId)}`, {
+        query: { after_seq: afterSeq },
+        organizationId,
+        signal,
+      }).then((r) => r.data),
+    send: (conversationId: string, body: string, organizationId: string, afterSeq = 0) =>
+      apiRequest<ConversationView>(`/api/conversations/${enc(conversationId)}/messages`, {
+        method: 'POST',
+        query: { after_seq: afterSeq },
+        body: { body },
+        organizationId,
+      }).then((r) => r.data),
+    markRead: (conversationId: string, organizationId: string) =>
+      apiRequest<{ unread: number }>(`/api/conversations/${enc(conversationId)}/read`, {
+        method: 'POST',
+        organizationId,
+      }).then((r) => r.data),
   },
 
   ai: {

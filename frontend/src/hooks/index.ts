@@ -10,4 +10,6 @@ export { useTranscribeAudio } from './useTranscribeAudio';
 export { useVoiceInput } from './useVoiceInput';
 export type { VoiceInputMode, VoiceInputStatus } from './useVoiceInput';
 export { useExtractRequirement } from './useExtractRequirement';
+export { useOpenConversation, useInbox, useConversationThread, CHAT_POLL_MS } from './useChat';
+export { useChatIdentity } from './useChatIdentity';
 export { queryKeys } from './queryKeys';

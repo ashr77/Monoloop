@@ -238,3 +238,14 @@ class TranscribeAudioRequest(StrictInput):
 class ExtractRequirementRequest(StrictInput):
     prompt: Annotated[str, StringConstraints(min_length=5, max_length=2000)]
     mock: bool | None = None
+
+
+# --- Buyer ↔ supplier chat (Member 1) --------------------------------------------
+
+
+class ConversationCreate(StrictInput):
+    listing_id: UuidStr
+
+
+class ChatMessageCreate(StrictInput):
+    body: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=2000)]

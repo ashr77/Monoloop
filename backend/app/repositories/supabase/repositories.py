@@ -19,6 +19,7 @@ Design notes
 from __future__ import annotations
 
 import asyncio
+import logging
 import re
 from typing import Any
 
@@ -33,6 +34,7 @@ from app.repositories.base import (
     NewExchangeItem,
     RequirementFilter,
 )
+from app.schemas.chat import ChatMessage, ConversationRecord
 from app.schemas.entities import (
     ActivityLog,
     ExchangeItemRecord,
@@ -49,6 +51,9 @@ REQUIREMENT_SELECT = "*,organization:organizations!requirements_organization_id_
 RETURN_ROWS = {"Prefer": "return=representation"}
 
 _DB_ERROR = re.compile(r"MONOLOOP:([A-Z_]+):(.*)", re.S)
+# PostgREST / Postgres codes for "function / table / column does not exist".
+_SCHEMA_MISSING = {"PGRST202", "PGRST205", "PGRST204", "42883", "42P01", "42703"}
+logger = logging.getLogger("monoloop.db")
 _SEARCH_UNSAFE = re.compile(r"[^\w\s.\-]", re.UNICODE)
 
 
@@ -82,6 +87,12 @@ def translate_rest_error(response: httpx.Response) -> AppError:
         return AppError("DUPLICATE_EXCHANGE", "An active exchange already exists for this requirement.")
     if code == "23514":
         return AppError("INSUFFICIENT_STOCK", "Inventory constraint rejected the change.")
+    if code in _SCHEMA_MISSING:
+        # A function, table or column the code expects does not exist: a migration was not applied.
+        # The details (object name) go to the server log only.
+        logger.error("Supabase schema is out of date (%s): %s", code, message)
+        return AppError("SERVICE_UNAVAILABLE", "The database is missing a migration. Apply every file in "
+                                               "supabase/migrations in order, then try again.")
     if response.status_code in (401, 403):
         return AppError("SERVICE_UNAVAILABLE", "Database API rejected the backend credentials.")
     return AppError("INTERNAL_ERROR", "Database error.")
@@ -355,3 +366,56 @@ class SupabaseExchangeRepository:
         else:
             fn = "complete_exchange" if action == "complete" else "cancel_exchange"
             await self.rest.rpc(fn, {"p_exchange_id": exchange_id, "p_actor_id": actor_id})
+
+
+class SupabaseChatRepository:
+    """Buyer ↔ supplier chat over PostgREST. Writes are single /rpc calls to the migration-00007
+    functions (one transaction each); reads filter by participant and the polling cursor."""
+
+    def __init__(self, client: httpx.AsyncClient):
+        self.rest = _Rest(client)
+
+    @staticmethod
+    def _require_uuid(value: str, what: str) -> None:
+        if not is_uuid(value):
+            raise AppError("NOT_FOUND", f"{what} {value} was not found.")
+
+    async def open_conversation(self, listing_id: str, buyer_id: str) -> str:
+        self._require_uuid(listing_id, "Listing")
+        return str(await self.rest.rpc("open_listing_conversation", {"p_listing_id": listing_id, "p_buyer_id": buyer_id}))
+
+    async def get_conversation(self, conversation_id: str) -> ConversationRecord | None:
+        if not is_uuid(conversation_id):
+            return None
+        rows = await self.rest.get("listing_conversations", {"select": "*", "id": f"eq.{conversation_id}"})
+        return ConversationRecord.model_validate(rows[0]) if rows else None
+
+    async def list_conversations(self, organization_id: str) -> list[ConversationRecord]:
+        if not is_uuid(organization_id):
+            return []
+        rows = await self.rest.get("listing_conversations", {
+            "select": "*",
+            "or": f"(buyer_organization_id.eq.{organization_id},supplier_organization_id.eq.{organization_id})",
+            "order": "last_message_at.desc",
+            "limit": "200",
+        })
+        return [ConversationRecord.model_validate(r) for r in rows]
+
+    async def messages(self, conversation_id: str, after_seq: int, limit: int) -> list[ChatMessage]:
+        if not is_uuid(conversation_id):
+            return []
+        rows = await self.rest.get("listing_messages", {
+            "select": "*", "conversation_id": f"eq.{conversation_id}", "seq": f"gt.{int(after_seq)}",
+            "order": "seq.asc", "limit": str(int(limit)),
+        })
+        return [ChatMessage.model_validate(r) for r in rows]
+
+    async def post_message(self, conversation_id: str, actor_id: str, body: str) -> str:
+        self._require_uuid(conversation_id, "Conversation")
+        return str(await self.rest.rpc("post_listing_message", {
+            "p_conversation_id": conversation_id, "p_actor_id": actor_id, "p_body": body,
+        }))
+
+    async def mark_read(self, conversation_id: str, actor_id: str) -> None:
+        self._require_uuid(conversation_id, "Conversation")
+        await self.rest.rpc("mark_listing_conversation_read", {"p_conversation_id": conversation_id, "p_actor_id": actor_id})
