@@ -110,10 +110,105 @@ class SpecificationRule:
         )
 
 
+@dataclass(frozen=True, slots=True)
+class AxisSpec:
+    """What a requirement asks for on one axis (migration 00005: exact XOR range, or nothing).
+
+    exact            the value must match (within DIMENSION_TOLERANCE_MM)
+    minimum/maximum  the value must lie in [minimum, maximum]; no maximum = "at least minimum"
+    neither          any value is accepted on this axis
+    """
+
+    exact: float | None = None
+    minimum: float | None = None
+    maximum: float | None = None
+
+    @classmethod
+    def of(cls, requirement: Requirement, axis: str) -> AxisSpec:
+        return cls(getattr(requirement, f"{axis}_mm", None), getattr(requirement, f"{axis}_min_mm", None),
+                   getattr(requirement, f"{axis}_max_mm", None))
+
+    @property
+    def is_exact(self) -> bool:
+        return self.exact is not None
+
+    @property
+    def is_any(self) -> bool:
+        return self.exact is None and self.minimum is None and self.maximum is None
+
+    @property
+    def valid(self) -> bool:
+        if self.is_exact:
+            return is_positive(self.exact)
+        if self.is_any:
+            return True
+        return (is_positive(self.minimum) and (self.maximum is None or is_positive(self.maximum))
+                and (self.maximum is None or self.minimum <= self.maximum + DIMENSION_TOLERANCE_MM))
+
+    def accepts(self, value: float) -> bool:
+        if self.is_exact:
+            return same_mm(value, self.exact)
+        if self.is_any:
+            return True
+        if value < self.minimum - DIMENSION_TOLERANCE_MM:
+            return False
+        return self.maximum is None or value <= self.maximum + DIMENSION_TOLERANCE_MM
+
+    def describe(self) -> str:
+        """Short form without unit: "2440", "2000–2500", "≥ 1200", "any"."""
+        if self.is_exact:
+            return fmt(self.exact)
+        if self.is_any:
+            return "any"
+        if self.maximum is None:
+            return f"≥ {fmt(self.minimum)}"
+        return f"{fmt(self.minimum)}–{fmt(self.maximum)}"
+
+
+def _size_specs(ctx: RuleContext) -> tuple[AxisSpec, AxisSpec]:
+    return AxisSpec.of(ctx.requirement, "length"), AxisSpec.of(ctx.requirement, "width")
+
+
+def _size_fit(ctx: RuleContext) -> tuple[bool, bool, bool]:
+    """(valid, direct, rotated) for exact sizes and for ranges alike."""
+    l = ctx.listing
+    length, width = _size_specs(ctx)
+    valid = is_positive(l.length_mm) and is_positive(l.width_mm) and length.valid and width.valid
+    direct = valid and length.accepts(l.length_mm) and width.accepts(l.width_mm)
+    rotated = valid and not direct and length.accepts(l.width_mm) and width.accepts(l.length_mm)
+    return valid, direct, rotated
+
+
 class DimensionsRule:
-    """Exact length × width in either orientation; larger sheets are never cut down."""
+    """Length × width in either orientation; larger sheets are never cut down.
+
+    Exact requirements must match exactly (the original rule, unchanged). Range requirements accept
+    any size inside the buyer's min–max per axis; an axis with no value accepts any size.
+    """
 
     def check(self, ctx: RuleContext) -> RuleCheck:
+        l = ctx.listing
+        length, width = _size_specs(ctx)
+        if length.is_exact and width.is_exact:
+            return self._exact(ctx)
+        valid, direct, rotated = _size_fit(ctx)
+        wanted = f"length {length.describe()} mm × width {width.describe()} mm"
+        if not valid:
+            message = "Dimensions are missing or invalid; compatibility cannot be assumed."
+        elif direct:
+            message = f"Size {format_size(l.length_mm, l.width_mm)} is within the required {wanted}."
+        elif rotated:
+            message = f"Size {format_size(l.length_mm, l.width_mm)} is within the required {wanted} when rotated 90°."
+        else:
+            message = f"Size {format_size(l.length_mm, l.width_mm)} is outside the required {wanted} (sheets are not cut down)."
+        actual = format_size(l.length_mm, l.width_mm) if is_positive(l.length_mm) and is_positive(l.width_mm) else "(missing)"
+        return RuleCheck(
+            rule="DIMENSIONS", passed=direct or rotated, expected=f"{length.describe()}×{width.describe()} mm",
+            actual=actual, message=message,
+        )
+
+    @staticmethod
+    def _exact(ctx: RuleContext) -> RuleCheck:
         r, l = ctx.requirement, ctx.listing
         valid = all(is_positive(v) for v in (l.length_mm, l.width_mm, r.length_mm, r.width_mm))
         direct = valid and same_mm(l.length_mm, r.length_mm) and same_mm(l.width_mm, r.width_mm)
@@ -134,27 +229,40 @@ class DimensionsRule:
 
     @staticmethod
     def is_rotated(ctx: RuleContext) -> bool:
-        r, l = ctx.requirement, ctx.listing
-        valid = all(is_positive(v) for v in (l.length_mm, l.width_mm, r.length_mm, r.width_mm))
-        direct = valid and same_mm(l.length_mm, r.length_mm) and same_mm(l.width_mm, r.width_mm)
-        return valid and not direct and same_mm(l.length_mm, r.width_mm) and same_mm(l.width_mm, r.length_mm)
+        return _size_fit(ctx)[2]
 
 
 class ThicknessRule:
+    """Exact thickness must match; a range accepts min–max; no value accepts any thickness."""
+
     def check(self, ctx: RuleContext) -> RuleCheck:
         r, l = ctx.requirement, ctx.listing
-        valid = is_positive(l.thickness_mm) and is_positive(r.thickness_mm)
-        ok = valid and same_mm(l.thickness_mm, r.thickness_mm)
+        spec = AxisSpec.of(r, "thickness")
+        if spec.is_exact:
+            valid = is_positive(l.thickness_mm) and is_positive(r.thickness_mm)
+            ok = valid and same_mm(l.thickness_mm, r.thickness_mm)
+            if not valid:
+                message = "Thickness is missing or invalid; compatibility cannot be assumed."
+            elif ok:
+                message = "Thickness matches."
+            else:
+                message = f"Thickness {fmt(l.thickness_mm)} mm does not match required {fmt(r.thickness_mm)} mm."
+            return RuleCheck(
+                rule="THICKNESS", passed=ok, expected=f"{fmt(r.thickness_mm)} mm",
+                actual=f"{fmt(l.thickness_mm)} mm", message=message,
+            )
+        valid = is_positive(l.thickness_mm) and spec.valid
+        ok = valid and spec.accepts(l.thickness_mm)
+        actual = f"{fmt(l.thickness_mm)} mm" if is_positive(l.thickness_mm) else "(missing)"
         if not valid:
             message = "Thickness is missing or invalid; compatibility cannot be assumed."
+        elif spec.is_any:
+            message = f"Any thickness accepted (listing is {fmt(l.thickness_mm)} mm)."
         elif ok:
-            message = "Thickness matches."
+            message = f"Thickness {fmt(l.thickness_mm)} mm is within the required {spec.describe()} mm."
         else:
-            message = f"Thickness {fmt(l.thickness_mm)} mm does not match required {fmt(r.thickness_mm)} mm."
-        return RuleCheck(
-            rule="THICKNESS", passed=ok, expected=f"{fmt(r.thickness_mm)} mm",
-            actual=f"{fmt(l.thickness_mm)} mm", message=message,
-        )
+            message = f"Thickness {fmt(l.thickness_mm)} mm is outside the required {spec.describe()} mm."
+        return RuleCheck(rule="THICKNESS", passed=ok, expected=f"{spec.describe()} mm", actual=actual, message=message)
 
 
 class ConditionRule:

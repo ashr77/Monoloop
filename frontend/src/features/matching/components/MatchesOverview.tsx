@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { ArrowUpRight } from 'lucide-react';
 import { useMatchesOverview } from '@/hooks';
 import { errorMessage } from '@/lib/api/client';
+import { requirementSize } from '@/lib/dimensions';
 import { SPEC_LABEL, bdt, matchMono, matchSans, num, t, unitNoun } from './theme';
 import { MatchLoadError, MatchSkeleton } from './MatchStates';
 import type { MatchResult } from '../types';
@@ -82,7 +83,7 @@ export function MatchesOverview() {
                         <span className="text-[#1d1d1d]/40">{unitNoun(req.material_family)}</span>
                       </p>
                       <p className={`${t.mono} text-xs ${t.muted}`}>
-                        {num(req.length_mm)}×{num(req.width_mm)}×{num(req.thickness_mm)} mm
+                        {requirementSize(req, '×')}
                       </p>
                     </div>
                     <div className="space-y-2 md:col-span-4">
