@@ -3,7 +3,8 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
-import { Building2, Loader2 } from 'lucide-react';
+import { Building2 } from 'lucide-react';
+import { Button } from '@/components/ui';
 import { homeFor, useAuth } from '@/lib/auth/AuthProvider';
 import { ApiError, errorMessage } from '@/lib/api/client';
 import { BANGLADESH_CITIES } from '@/lib/constants';
@@ -35,7 +36,7 @@ export default function SignupPage() {
   if (mode === 'demo') {
     return (
       <AuthCard title="Registration is off" subtitle="This server runs in demo mode with sample companies.">
-        <Link href="/" className="text-sm font-semibold text-emerald-700 hover:underline">
+        <Link href="/" className="link text-sm">
           Go to the dashboard →
         </Link>
       </AuthCard>
@@ -74,21 +75,21 @@ export default function SignupPage() {
       footer={
         <>
           Already registered?{' '}
-          <Link href="/login" className="font-semibold text-emerald-700 hover:underline">
+          <Link href="/login" className="link">
             Sign in
           </Link>
         </>
       }
     >
-      <form onSubmit={submit} className="space-y-4" noValidate>
+      <form onSubmit={submit} className="space-y-5" noValidate>
         <Field label="Company name" required value={form.company_name} onChange={set('company_name')} error={errors.company_name} />
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
           <label className="block">
-            <span className="text-sm font-semibold text-slate-700">City</span>
+            <span className="field-label">City</span>
             <select
               value={form.city}
               onChange={set('city')}
-              className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+              className="field mt-1.5"
             >
               {BANGLADESH_CITIES.map((c) => (
                 <option key={c}>{c}</option>
@@ -106,7 +107,7 @@ export default function SignupPage() {
         </div>
         <Field label="Address (optional)" value={form.address} onChange={set('address')} />
         <Field label="Email" type="email" autoComplete="email" required value={form.email} onChange={set('email')} error={errors.email} />
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
           <Field
             label="Password"
             type="password"
@@ -114,6 +115,7 @@ export default function SignupPage() {
             required
             value={form.password}
             onChange={set('password')}
+            hint="At least 8 characters."
             error={errors.password}
           />
           <Field
@@ -127,14 +129,9 @@ export default function SignupPage() {
           />
         </div>
         <FormError message={error} />
-        <button
-          type="submit"
-          disabled={busy}
-          className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-60"
-        >
-          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Building2 className="h-4 w-4" />}
+        <Button type="submit" variant="primary" size="lg" busy={busy} leading={<Building2 className="size-4" aria-hidden />} className="w-full">
           Submit for approval
-        </button>
+        </Button>
       </form>
     </AuthCard>
   );

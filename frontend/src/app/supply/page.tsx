@@ -1,3 +1,5 @@
+import { Suspense } from 'react';
+import { TableSkeleton } from '@/components/ui';
 import { SupplierDashboard } from '@/features/supply/components/SupplierDashboard';
 
 export const metadata = {
@@ -6,5 +8,16 @@ export const metadata = {
 };
 
 export default function SupplyPage() {
-  return <SupplierDashboard />;
+  // The dashboard reads ?scope= and ?compose= (useSearchParams needs a Suspense boundary).
+  return (
+    <Suspense
+      fallback={
+        <div className="page-shell py-12">
+          <TableSkeleton rows={6} columns={7} label="Loading surplus inventory" />
+        </div>
+      }
+    >
+      <SupplierDashboard />
+    </Suspense>
+  );
 }

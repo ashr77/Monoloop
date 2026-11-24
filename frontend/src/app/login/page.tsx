@@ -3,9 +3,10 @@
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useState, type FormEvent } from 'react';
-import { Loader2, LogIn } from 'lucide-react';
+import { LogIn } from 'lucide-react';
 import { homeFor, useAuth } from '@/lib/auth/AuthProvider';
 import { errorMessage } from '@/lib/api/client';
+import { Button } from '@/components/ui';
 import { AuthCard, Field, FormError } from '@/features/auth/AuthCard';
 
 function LoginForm() {
@@ -20,7 +21,7 @@ function LoginForm() {
   if (mode === 'demo') {
     return (
       <AuthCard title="Login is off" subtitle="This server runs in demo mode: use the “Acting as” switchers instead.">
-        <Link href="/" className="text-sm font-semibold text-emerald-700 hover:underline">
+        <Link href="/" className="link text-sm">
           Go to the dashboard →
         </Link>
       </AuthCard>
@@ -48,13 +49,13 @@ function LoginForm() {
       footer={
         <>
           New company?{' '}
-          <Link href="/signup" className="font-semibold text-emerald-700 hover:underline">
+          <Link href="/signup" className="link">
             Register with your trade licence
           </Link>
         </>
       }
     >
-      <form onSubmit={submit} className="space-y-4">
+      <form onSubmit={submit} className="space-y-5">
         <Field label="Email" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
         <Field
           label="Password"
@@ -65,14 +66,9 @@ function LoginForm() {
           onChange={(e) => setPassword(e.target.value)}
         />
         <FormError message={error} />
-        <button
-          type="submit"
-          disabled={busy}
-          className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-60"
-        >
-          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogIn className="h-4 w-4" />}
+        <Button type="submit" variant="primary" size="lg" busy={busy} leading={<LogIn className="size-4" aria-hidden />} className="w-full">
           Sign in
-        </button>
+        </Button>
       </form>
     </AuthCard>
   );

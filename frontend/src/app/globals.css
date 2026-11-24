@@ -2,26 +2,165 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ============================================================================
+   MONOLOOP — Industrial Copper base layer
+   Tokens live in tailwind.config.ts; CSS variables mirror them for inline SVG.
+   ========================================================================== */
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --graphite: #20252a;
+  --copper: #c66b3d;
+  --copper-600: #b35a2e;
+  --sand: #e5d5bd;
+  --cream: #f8f5ed;
+  --paper: #fcfbf7;
+  --slate: #657580;
+  --rule: rgba(32, 37, 42, 0.12);
+  --rule-strong: rgba(32, 37, 42, 0.22);
+
+  --background: var(--cream);
+  --foreground: var(--graphite);
+
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --header-h: 4rem;
+  color-scheme: light;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    scroll-padding-top: calc(var(--header-h) + 1rem);
+  }
+
+  body {
+    color: var(--foreground);
+    background: var(--background);
+    font-feature-settings: 'ss01', 'cv11';
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    background: rgba(198, 107, 61, 0.22);
+    color: var(--graphite);
+  }
+
+  /* One visible, consistent focus ring everywhere (keyboard only). */
+  :focus-visible {
+    outline: 2px solid var(--copper);
+    outline-offset: 2px;
+  }
+  :focus:not(:focus-visible) {
+    outline: none;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    color: var(--graphite);
+    text-wrap: balance;
+  }
+
+  /* Native form controls follow the palette. */
+  input,
+  select,
+  textarea {
+    accent-color: var(--copper);
+  }
+
+  table {
+    font-variant-numeric: tabular-nums;
   }
 }
 
-body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+@layer components {
+  /* ---------------------------------------------------------------- layout */
+  .page-shell {
+    @apply mx-auto w-full max-w-page px-4 sm:px-6 lg:px-10;
+  }
+
+  /* ------------------------------------------------------------ typography */
+  .t-eyebrow {
+    @apply font-mono text-label font-medium uppercase text-slate-600;
+  }
+  .t-label {
+    @apply font-mono text-[0.6875rem] font-medium uppercase tracking-[0.06em] text-slate-600;
+  }
+  .t-meta {
+    @apply text-xs text-slate-600;
+  }
+  .t-num {
+    @apply font-mono tabular-nums;
+  }
+
+  /* ----------------------------------------------------------------- rules */
+  .rule {
+    border-color: var(--rule);
+  }
+  .rule-strong {
+    border-color: var(--rule-strong);
+  }
+
+  /* ---------------------------------------------------------------- fields */
+  .field {
+    @apply w-full rounded-sm border border-graphite/20 bg-cream-paper px-3 py-2 text-sm text-graphite placeholder:text-slate-400
+      transition-[border-color,box-shadow] duration-fast ease-out
+      hover:border-graphite/35 focus:border-copper focus:outline-none focus:ring-2 focus:ring-copper/20
+      disabled:cursor-not-allowed disabled:opacity-60;
+  }
+  .field-invalid {
+    @apply border-brick-500 focus:border-brick-600 focus:ring-brick-500/20;
+  }
+  .field-label {
+    @apply block text-[13px] font-medium text-graphite;
+  }
+  .field-hint {
+    @apply mt-1 block text-xs text-slate-600;
+  }
+  .field-error {
+    @apply mt-1 block text-xs font-medium text-brick-700;
+  }
+
+  /* Underline-style link used inside editorial copy. */
+  .link {
+    @apply font-medium text-copper-700 underline decoration-copper/40 underline-offset-[3px] transition-colors duration-fast hover:decoration-copper;
+  }
 }
 
 @layer utilities {
   .text-balance {
     text-wrap: balance;
+  }
+  .text-pretty {
+    text-wrap: pretty;
+  }
+  .scrollbar-none {
+    scrollbar-width: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+  /* Fine engineering grid for editorial backgrounds. */
+  .bg-grid {
+    background-image: linear-gradient(to right, var(--rule) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--rule) 1px, transparent 1px);
+    background-size: 48px 48px;
+  }
+  .bg-grid-dark {
+    background-image: linear-gradient(to right, rgba(248, 245, 237, 0.06) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(248, 245, 237, 0.06) 1px, transparent 1px);
+    background-size: 48px 48px;
+  }
+}
+
+/* Respect reduced-motion everywhere, including CSS animations and smooth scrolling. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
   }
 }

@@ -170,11 +170,11 @@ function AuthGate({ children }: { children: ReactNode }) {
 
   if (mode === 'loading' || !ok) {
     return (
-      <div className="flex min-h-[50vh] flex-col items-center justify-center gap-2 text-slate-500">
-        <span className="flex items-center">
-          <Loader2 className="mr-2 h-5 w-5 animate-spin text-emerald-600" /> Loading…
+      <div className="flex min-h-[60vh] flex-col items-center justify-center gap-3 px-4 text-center" role="status">
+        <span className="flex items-center gap-2.5 font-mono text-xs uppercase tracking-[0.08em] text-slate-600">
+          <Loader2 className="h-4 w-4 animate-spin text-copper" aria-hidden /> Loading
         </span>
-        {mode === 'loading' && <span className="text-xs text-slate-400">Waking up the server, this can take up to a minute.</span>}
+        {mode === 'loading' && <span className="max-w-xs text-sm text-slate-600">Waking up the server, this can take up to a minute.</span>}
       </div>
     );
   }

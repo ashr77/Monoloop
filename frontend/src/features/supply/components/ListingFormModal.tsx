@@ -1,13 +1,9 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import {
-  X,
-  Sparkles,
-  AlertCircle,
-  CheckCircle2,
-  TriangleAlert,
-} from 'lucide-react';
+import { useState, useEffect, useId, useRef, type ReactNode } from 'react';
+import { Sparkles, AlertCircle, CheckCircle2, TriangleAlert } from 'lucide-react';
+import { Button, Dialog, ErrorState, Note } from '@/components/ui';
+import { cn } from '@/lib/utils';
 import { MaterialListing, Organization } from '@/lib/types';
 import {
   MATERIAL_FAMILIES,
@@ -47,6 +43,9 @@ export function ListingFormModal({
   const isEditing = Boolean(initialData);
   const saveListing = useSaveListing();
   const extractMaterial = useExtractMaterial();
+  const uid = useId();
+  const formId = `${uid}-form`;
+  const formRef = useRef<HTMLFormElement>(null);
 
   // Form State
   const [organizationId, setOrganizationId] = useState(
@@ -101,6 +100,12 @@ export function ListingFormModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [generalError, setGeneralError] = useState<string | null>(null);
+
+  // After a failed validation, move focus to the first field that needs attention.
+  useEffect(() => {
+    if (Object.keys(formErrors).length === 0) return;
+    formRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus();
+  }, [formErrors]);
 
   // Sync state when editing or reopening
   useEffect(() => {
@@ -269,128 +274,130 @@ export function ListingFormModal({
     }
   };
 
-  if (!isOpen) return null;
+
+  const cityOptions = BANGLADESH_CITIES as readonly string[];
+  const steps = isEditing
+    ? { assist: '', material: '01', dimensions: '02', quantity: '03', location: '04' }
+    : { assist: '01', material: '02', dimensions: '03', quantity: '04', location: '05' };
+  const fieldId = (name: string) => `${uid}-${name}`;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm overflow-y-auto">
-      <div className="relative w-full max-w-4xl bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden my-8">
-        {/* Modal Header */}
-        <div className="flex items-center justify-between px-8 py-5 border-b border-slate-100 bg-slate-50">
-          <div>
-            <h2 className="text-xl font-bold text-slate-900">
-              {isEditing ? 'Edit Surplus Material Listing' : 'Publish New Surplus Material Listing'}
-            </h2>
-            <p className="text-sm text-slate-500">
-              {isEditing
-                ? 'Update specifications or available stock. Reserved stock is strictly protected.'
-                : 'Offer industrial surplus to connected manufacturers. All specifications require verification.'}
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-1 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        <div className="p-8 space-y-7 max-h-[82vh] overflow-y-auto">
-          {/* General Error Banner */}
-          {generalError && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 flex-shrink-0" />
-              <span>{generalError}</span>
-            </div>
+    <Dialog
+      open={isOpen}
+      onClose={onClose}
+      size="lg"
+      dismissible={!isSubmitting}
+      eyebrow={isEditing ? 'Supply · Edit listing' : 'Supply · New listing'}
+      title={isEditing ? 'Edit Surplus Material Listing' : 'Publish New Surplus Material Listing'}
+      description={
+        isEditing
+          ? 'Update specifications or available stock. Reserved stock is strictly protected.'
+          : 'Offer industrial surplus to connected manufacturers. All specifications require verification.'
+      }
+      footer={
+        <>
+          {Object.keys(formErrors).length > 0 && (
+            <p className="mr-auto text-xs font-medium text-brick-700">Check the highlighted fields before saving.</p>
           )}
-
-          {/* AI SMART LISTING ASSISTANT (Only in Create Mode) */}
-          {!isEditing && (
-            <div className="border border-blue-200 bg-gradient-to-br from-blue-50/70 to-indigo-50/40 p-5 rounded-xl space-y-4">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="flex items-center gap-2 text-blue-900 font-semibold text-base">
-                  <Sparkles className="w-5 h-5 text-blue-600" />
-                  <span>AI Smart Material Listing Assistant</span>
-                </div>
+          <Button variant="secondary" onClick={onClose} disabled={isSubmitting}>
+            Cancel
+          </Button>
+          <Button type="submit" form={formId} busy={isSubmitting}>
+            {isSubmitting ? 'Saving Listing...' : isEditing ? 'Save Changes' : 'Publish Listing'}
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-6">
+        {/* AI-assisted description (create mode only) */}
+        {!isEditing && (
+          <FormSection id={fieldId('s-assist')} step={steps.assist} title="Describe it">
+            <div className="col-span-12 space-y-4 rounded-sm border border-graphite/10 bg-sand-50 p-4 sm:p-5">
+              <div className="space-y-1.5">
+                <p className="t-eyebrow flex items-center gap-1.5">
+                  <Sparkles className="size-3.5 text-copper-600" aria-hidden />
+                  Assist · AI Smart Material Listing Assistant
+                </p>
+                <p className="text-sm leading-relaxed text-slate-700">
+                  Describe your excess inventory in plain language (dimensions, grade, quantity, price, location),
+                  typed or spoken in English, Bangla or Japanese. Our server-side LLM extracts structured attributes
+                  for your review.
+                </p>
+                <p className="text-xs text-slate-600">
+                  Extracted values are suggestions, not verified data. They fill the form below and must be checked
+                  field by field before you publish.
+                </p>
               </div>
 
-              <p className="text-sm text-slate-600">
-                Describe your excess inventory in plain language (dimensions, grade, quantity, price, location),
-                typed or spoken in English, Bangla or Japanese. Our server-side LLM extracts structured attributes
-                for your review.
-              </p>
-
-              <div className="space-y-2">
+              <div>
+                <label htmlFor={fieldId('ai-prompt')} className="field-label">
+                  Plain-language description
+                </label>
                 <textarea
+                  id={fieldId('ai-prompt')}
+                  data-autofocus
                   rows={3}
                   value={aiPrompt}
                   onChange={(e) => setAiPrompt(e.target.value)}
                   placeholder="e.g. We have 40 unused stainless steel sheets, grade SS304, 2mm thick, 1000 by 500 mm, leftover from production. Price is 450 taka per sheet in Gazipur."
-                  className="w-full text-base p-3 rounded-lg border border-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                  className="field mt-1.5 resize-y leading-relaxed"
                 />
+              </div>
 
-                <VoiceInputControl onTranscript={appendTranscript} disabled={isExtracting} />
+              <VoiceInputControl onTranscript={appendTranscript} disabled={isExtracting} />
 
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      disabled={isExtracting}
-                      onClick={() => handleAiExtract(false)}
-                      className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-semibold rounded-lg shadow-sm transition"
-                    >
-                      <Sparkles className="w-4 h-4" />
-                      <span>{isExtracting ? 'Analyzing Prompt...' : 'Extract with AI'}</span>
-                    </button>
-                    <button
-                      type="button"
-                      disabled={isExtracting}
-                      onClick={() => handleAiExtract(true)}
-                      className="text-sm text-blue-700 hover:underline px-2 py-1"
-                      title="Run with deterministic heuristic simulation without external API key"
-                    >
-                      (Test with Mock Parser)
-                    </button>
-                  </div>
-                </div>
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t rule pt-4">
+                <Button
+                  variant="ink"
+                  size="sm"
+                  busy={isExtracting}
+                  onClick={() => handleAiExtract(false)}
+                  leading={<Sparkles className="size-4" aria-hidden />}
+                >
+                  {isExtracting ? 'Analyzing Prompt...' : 'Extract with AI'}
+                </Button>
+                <Button
+                  variant="link"
+                  size="sm"
+                  disabled={isExtracting}
+                  onClick={() => handleAiExtract(true)}
+                  title="Run with deterministic heuristic simulation without external API key"
+                >
+                  Test with Mock Parser
+                </Button>
               </div>
 
               {/* AI status: success fades after a moment; warnings and errors stay */}
               {aiMessage && (
-                <div
-                  role={aiMessageType === 'error' ? 'alert' : 'status'}
-                  className={`p-3 rounded-lg text-sm flex items-start gap-2 ${
-                    aiMessageType === 'error'
-                      ? 'bg-red-50 text-red-700 border border-red-200'
-                      : aiMessageType === 'warning'
-                      ? 'bg-amber-50 text-amber-800 border border-amber-200'
-                      : 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-                  }`}
-                >
-                  {aiMessageType === 'error' ? (
-                    <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                  ) : aiMessageType === 'warning' ? (
-                    <TriangleAlert className="w-4 h-4 flex-shrink-0 mt-0.5 text-amber-600" />
-                  ) : (
-                    <CheckCircle2 className="w-4 h-4 flex-shrink-0 mt-0.5 text-emerald-600" />
-                  )}
-                  <p className="flex-1">{aiMessage}</p>
+                <div role={aiMessageType === 'error' ? 'alert' : 'status'}>
+                  <Note tone={aiMessageType === 'error' ? 'danger' : aiMessageType === 'warning' ? 'warning' : 'neutral'}>
+                    <span className="flex items-start gap-2">
+                      {aiMessageType === 'error' ? (
+                        <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden />
+                      ) : aiMessageType === 'warning' ? (
+                        <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
+                      ) : (
+                        <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-copper-700" aria-hidden />
+                      )}
+                      <span>{aiMessage}</span>
+                    </span>
+                  </Note>
                 </div>
               )}
             </div>
-          )}
+          </FormSection>
+        )}
 
-          {/* MANUAL SPECIFICATION FORM */}
-          <form onSubmit={handleSubmit} className="space-y-5">
-            {/* Supplier Organization */}
-            <div>
-              <label className="block text-sm font-bold text-slate-700 uppercase tracking-wide mb-1.5">
-                Supplier Organization (Demo Profile)
-              </label>
+        <form id={formId} ref={formRef} onSubmit={handleSubmit} className={cn('space-y-6', !isEditing && 'border-t rule pt-6')}>
+          {/* Material */}
+          <FormSection id={fieldId('s-material')} step={steps.material} title="Material">
+            <Field id={fieldId('org')} label="Supplier organization" hint="Demo profile." className="col-span-12">
               <select
+                {...controlProps(fieldId('org'), undefined, true)}
                 disabled={isEditing || identity.locked}
                 value={organizationId}
                 onChange={(e) => setOrganizationId(e.target.value)}
-                className="w-full text-base p-3 rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                className="field"
               >
                 {organizations
                   .filter((o) => (identity.locked ? o.id === identity.organizationId : o.organization_type === 'SUPPLIER'))
@@ -400,249 +407,308 @@ export function ListingFormModal({
                     </option>
                   ))}
               </select>
-            </div>
+            </Field>
 
-            {/* Material Family & Specification */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-bold text-slate-700 uppercase tracking-wide mb-1.5">
-                  Material Family <span className="text-red-500">*</span>
-                </label>
-                <select
-                  value={materialFamily}
-                  onChange={(e) => handleFamilyChange(e.target.value as MaterialFamily)}
-                  className="w-full text-base p-3 rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                >
-                  {MATERIAL_FAMILIES.map((fam) => (
-                    <option key={fam} value={fam}>
-                      {fam === 'STAINLESS_STEEL_SHEET' ? 'Stainless Steel Sheet' : 'Plywood Panel'}
-                    </option>
-                  ))}
-                </select>
-              </div>
+            <Field id={fieldId('family')} label="Material family" required className="col-span-12 sm:col-span-6">
+              <select
+                {...controlProps(fieldId('family'))}
+                data-autofocus={isEditing || undefined}
+                value={materialFamily}
+                onChange={(e) => handleFamilyChange(e.target.value as MaterialFamily)}
+                className="field"
+              >
+                {MATERIAL_FAMILIES.map((fam) => (
+                  <option key={fam} value={fam}>
+                    {fam === 'STAINLESS_STEEL_SHEET' ? 'Stainless Steel Sheet' : 'Plywood Panel'}
+                  </option>
+                ))}
+              </select>
+            </Field>
 
-              <div>
-                <label className="block text-sm font-bold text-slate-700 uppercase tracking-wide mb-1.5">
-                  Grade / Technical Specification <span className="text-red-500">*</span>
-                </label>
-                <select
-                  value={materialSpecification}
-                  onChange={(e) => setMaterialSpecification(e.target.value)}
-                  className="w-full text-base p-3 rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                >
-                  {MATERIAL_SPECIFICATIONS[materialFamily].map((spec) => (
-                    <option key={spec} value={spec}>
-                      {spec}
-                    </option>
-                  ))}
-                </select>
-                {formErrors.material_specification && (
-                  <p className="text-sm text-red-600 mt-1">{formErrors.material_specification}</p>
-                )}
-              </div>
-            </div>
+            <Field
+              id={fieldId('spec')}
+              label="Grade / technical specification"
+              required
+              error={formErrors.material_specification}
+              className="col-span-12 sm:col-span-6"
+            >
+              <select
+                {...controlProps(fieldId('spec'), formErrors.material_specification)}
+                value={materialSpecification}
+                onChange={(e) => setMaterialSpecification(e.target.value)}
+                className={cn('field', formErrors.material_specification && 'field-invalid')}
+              >
+                {MATERIAL_SPECIFICATIONS[materialFamily].map((spec) => (
+                  <option key={spec} value={spec}>
+                    {spec}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          </FormSection>
 
-            {/* Dimensions (Length, Width, Thickness) */}
-            <div className="grid grid-cols-3 gap-3">
-              <div>
-                <label className="block text-sm font-bold text-slate-700 uppercase tracking-wide mb-1.5">
-                  Length (mm) <span className="text-red-500">*</span>
-                </label>
+          {/* Dimensions */}
+          <FormSection id={fieldId('s-dimensions')} step={steps.dimensions} title="Dimensions" description="Millimetres, per piece.">
+            {(
+              [
+                ['length', 'Length', 'length_mm', lengthMm, setLengthMm, 'e.g. 2400'],
+                ['width', 'Width', 'width_mm', widthMm, setWidthMm, 'e.g. 1200'],
+                ['thickness', 'Thickness', 'thickness_mm', thicknessMm, setThicknessMm, 'e.g. 2.0'],
+              ] as const
+            ).map(([name, label, key, value, setValue, placeholder]) => (
+              <Field
+                key={name}
+                id={fieldId(name)}
+                label={label}
+                unit="mm"
+                required
+                error={formErrors[key]}
+                className="col-span-12 sm:col-span-4"
+              >
                 <input
+                  {...controlProps(fieldId(name), formErrors[key])}
                   type="number"
+                  inputMode="decimal"
                   step="any"
-                  placeholder="e.g. 2400"
-                  value={lengthMm}
-                  onChange={(e) => setLengthMm(e.target.value)}
-                  className={`w-full text-base p-3 rounded-lg border bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
-                    formErrors.length_mm ? 'border-red-400 bg-red-50/30' : 'border-slate-300'
-                  }`}
+                  placeholder={placeholder}
+                  value={value}
+                  onChange={(e) => setValue(e.target.value)}
+                  className={cn('field pr-11 tabular-nums', NO_SPIN, formErrors[key] && 'field-invalid')}
                 />
-                {formErrors.length_mm && (
-                  <p className="text-sm text-red-600 mt-1">{formErrors.length_mm}</p>
-                )}
-              </div>
+              </Field>
+            ))}
+          </FormSection>
 
-              <div>
-                <label className="block text-sm font-bold text-slate-700 uppercase tracking-wide mb-1.5">
-                  Width (mm) <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="number"
-                  step="any"
-                  placeholder="e.g. 1200"
-                  value={widthMm}
-                  onChange={(e) => setWidthMm(e.target.value)}
-                  className={`w-full text-base p-3 rounded-lg border bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
-                    formErrors.width_mm ? 'border-red-400 bg-red-50/30' : 'border-slate-300'
-                  }`}
-                />
-                {formErrors.width_mm && (
-                  <p className="text-sm text-red-600 mt-1">{formErrors.width_mm}</p>
-                )}
-              </div>
+          {/* Quantity & price */}
+          <FormSection id={fieldId('s-quantity')} step={steps.quantity} title="Quantity & price">
+            <Field
+              id={fieldId('qty')}
+              label="Total quantity"
+              unit="pcs"
+              required
+              error={formErrors.total_quantity}
+              className="col-span-12 sm:col-span-6 lg:col-span-4"
+            >
+              <input
+                {...controlProps(fieldId('qty'), formErrors.total_quantity)}
+                type="number"
+                inputMode="numeric"
+                step="1"
+                placeholder="e.g. 50"
+                value={totalQuantity}
+                onChange={(e) => setTotalQuantity(e.target.value)}
+                className={cn('field pr-12 tabular-nums', NO_SPIN, formErrors.total_quantity && 'field-invalid')}
+              />
+            </Field>
 
-              <div>
-                <label className="block text-sm font-bold text-slate-700 uppercase tracking-wide mb-1.5">
-                  Thickness (mm) <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="number"
-                  step="any"
-                  placeholder="e.g. 2.0"
-                  value={thicknessMm}
-                  onChange={(e) => setThicknessMm(e.target.value)}
-                  className={`w-full text-base p-3 rounded-lg border bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
-                    formErrors.thickness_mm ? 'border-red-400 bg-red-50/30' : 'border-slate-300'
-                  }`}
-                />
-                {formErrors.thickness_mm && (
-                  <p className="text-sm text-red-600 mt-1">{formErrors.thickness_mm}</p>
-                )}
-              </div>
-            </div>
+            <Field
+              id={fieldId('price')}
+              label="Unit price"
+              unit="BDT"
+              required
+              hint="Per piece."
+              error={formErrors.unit_price_bdt}
+              className="col-span-12 sm:col-span-6 lg:col-span-4"
+            >
+              <input
+                {...controlProps(fieldId('price'), formErrors.unit_price_bdt, true)}
+                type="number"
+                inputMode="decimal"
+                step="any"
+                placeholder="e.g. 4200"
+                value={unitPriceBdt}
+                onChange={(e) => setUnitPriceBdt(e.target.value)}
+                className={cn('field pr-12 tabular-nums', NO_SPIN, formErrors.unit_price_bdt && 'field-invalid')}
+              />
+            </Field>
 
-            {/* Quantity & Reserved Stock Information */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-bold text-slate-700 uppercase tracking-wide mb-1.5">
-                  Total Quantity (Pieces) <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="number"
-                  step="1"
-                  placeholder="e.g. 50"
-                  value={totalQuantity}
-                  onChange={(e) => setTotalQuantity(e.target.value)}
-                  className={`w-full text-base p-3 rounded-lg border bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
-                    formErrors.total_quantity ? 'border-red-400 bg-red-50/30' : 'border-slate-300'
-                  }`}
-                />
-                {formErrors.total_quantity && (
-                  <p className="text-sm text-red-600 mt-1">{formErrors.total_quantity}</p>
-                )}
-              </div>
+            <Field id={fieldId('condition')} label="Condition" required className="col-span-12 lg:col-span-4">
+              <select
+                {...controlProps(fieldId('condition'))}
+                value={condition}
+                onChange={(e) => setCondition(e.target.value as MaterialCondition)}
+                className="field"
+              >
+                {MATERIAL_CONDITIONS.map((cond) => (
+                  <option key={cond} value={cond}>
+                    {cond === 'UNUSED' ? 'UNUSED (Prime excess)' : cond === 'LEFTOVER' ? 'LEFTOVER (Batch surplus)' : 'OFFCUT (Factory cut piece)'}
+                  </option>
+                ))}
+              </select>
+            </Field>
 
-              <div>
-                <label className="block text-sm font-bold text-slate-700 uppercase tracking-wide mb-1.5">
-                  Condition <span className="text-red-500">*</span>
-                </label>
-                <select
-                  value={condition}
-                  onChange={(e) => setCondition(e.target.value as MaterialCondition)}
-                  className="w-full text-base p-3 rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                >
-                  {MATERIAL_CONDITIONS.map((cond) => (
-                    <option key={cond} value={cond}>
-                      {cond === 'UNUSED' ? 'UNUSED (Prime excess)' : cond === 'LEFTOVER' ? 'LEFTOVER (Batch surplus)' : 'OFFCUT (Factory cut piece)'}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            {/* Reserved Quantity Indicator (For Edit mode) */}
+            {/* Reserved quantity indicator (edit mode) */}
             {isEditing && initialData && (
-              <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800 flex items-center justify-between">
-                <span>
-                  Currently Reserved Stock: <strong>{initialData.reserved_quantity} pieces</strong>
-                </span>
-                <span className="text-amber-600">
-                  Available: {initialData.available_quantity} pieces
-                </span>
+              <div className="col-span-12">
+                <Note tone="warning">
+                  <span className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
+                    <span>
+                      Currently Reserved Stock: <strong className="t-num font-medium">{initialData.reserved_quantity} pieces</strong>
+                    </span>
+                    <span>
+                      Available: <span className="t-num">{initialData.available_quantity} pieces</span>
+                    </span>
+                  </span>
+                </Note>
               </div>
             )}
+          </FormSection>
 
-            {/* Price & Location */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-bold text-slate-700 uppercase tracking-wide mb-1.5">
-                  Unit Price (BDT / piece) <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="number"
-                  step="any"
-                  placeholder="e.g. 4200"
-                  value={unitPriceBdt}
-                  onChange={(e) => setUnitPriceBdt(e.target.value)}
-                  className={`w-full text-base p-3 rounded-lg border bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
-                    formErrors.unit_price_bdt ? 'border-red-400 bg-red-50/30' : 'border-slate-300'
-                  }`}
-                />
-                {formErrors.unit_price_bdt && (
-                  <p className="text-sm text-red-600 mt-1">{formErrors.unit_price_bdt}</p>
-                )}
-              </div>
+          {/* Location & notes */}
+          <FormSection id={fieldId('s-location')} step={steps.location} title="Location & notes">
+            <Field id={fieldId('city')} label="City / location" required error={formErrors.city} className="col-span-12 sm:col-span-6">
+              <select
+                {...controlProps(fieldId('city'), formErrors.city)}
+                value={city}
+                onChange={(e) => setCity(e.target.value)}
+                className={cn('field', formErrors.city && 'field-invalid')}
+              >
+                {cityOptions.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </Field>
 
-              <div>
-                <label className="block text-sm font-bold text-slate-700 uppercase tracking-wide mb-1.5">
-                  City / Location <span className="text-red-500">*</span>
-                </label>
-                <select
-                  value={city}
-                  onChange={(e) => setCity(e.target.value)}
-                  className="w-full text-base p-3 rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                >
-                  {BANGLADESH_CITIES.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
-                    </option>
-                  ))}
-                </select>
-                {formErrors.city && <p className="text-sm text-red-600 mt-1">{formErrors.city}</p>}
-              </div>
-            </div>
-
-            {/* Description & Optional Image URL */}
-            <div>
-              <label className="block text-sm font-bold text-slate-700 uppercase tracking-wide mb-1.5">
-                Description / Storage Condition
-              </label>
+            <Field id={fieldId('description')} label="Description / storage condition" className="col-span-12">
               <textarea
+                {...controlProps(fieldId('description'))}
                 rows={2}
                 placeholder="e.g. Stored indoors on pallets, clean edges, factory wrapped."
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                className="w-full text-base p-3 rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                className="field resize-y leading-relaxed"
               />
-            </div>
+            </Field>
 
-            <div>
-              <label className="block text-sm font-bold text-slate-700 uppercase tracking-wide mb-1.5">
-                Photo URL (Optional human inspection reference)
-              </label>
+            <Field
+              id={fieldId('image')}
+              label="Photo URL"
+              optional
+              hint="Optional human inspection reference. Photographs support visual check only; technical specifications are certified by numeric fields above."
+              className="col-span-12"
+            >
               <input
+                {...controlProps(fieldId('image'), undefined, true)}
                 type="url"
                 placeholder="https://example.com/images/metal-sheet.jpg"
                 value={imageUrl}
                 onChange={(e) => setImageUrl(e.target.value)}
-                className="w-full text-base p-3 rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                className="field"
               />
-              <p className="text-sm text-slate-400 mt-1">
-                Photographs support visual check only; technical specifications are certified by numeric fields above.
-              </p>
-            </div>
+            </Field>
+          </FormSection>
 
-            {/* Action Buttons */}
-            <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-3">
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-5 py-2.5 rounded-lg border border-slate-300 text-slate-700 text-base font-medium hover:bg-slate-50 transition"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="px-7 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-base font-bold shadow-sm transition flex items-center gap-2"
-              >
-                {isSubmitting ? 'Saving Listing...' : isEditing ? 'Save Changes' : 'Publish Listing'}
-              </button>
-            </div>
-          </form>
+          {/* Save failure: next to the actions so it is seen after submitting */}
+          {generalError && <ErrorState title="Listing not saved" message={generalError} />}
+        </form>
+      </div>
+    </Dialog>
+  );
+}
+
+/* ------------------------------------------------------------------ layout helpers */
+
+/** Hides the native number spinners so unit suffixes sit cleanly (arrow keys still step). */
+const NO_SPIN =
+  '[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none';
+
+/** Accessible wiring for a control rendered inside <Field>. */
+function controlProps(id: string, error?: string, hasHint = false) {
+  const describedBy = [hasHint && `${id}-hint`, error && `${id}-error`].filter(Boolean).join(' ');
+  return {
+    id,
+    'aria-invalid': error ? true : undefined,
+    'aria-describedby': describedBy || undefined,
+  };
+}
+
+function FormSection({
+  id,
+  step,
+  title,
+  description,
+  children,
+}: {
+  id: string;
+  step: string;
+  title: string;
+  description?: string;
+  children: ReactNode;
+}) {
+  return (
+    <section aria-labelledby={id} className="space-y-4 border-t rule pt-6 first:border-t-0 first:pt-0">
+      <div className="flex items-baseline gap-3">
+        <span className="font-mono text-xs tabular-nums text-copper-700" aria-hidden>
+          {step}
+        </span>
+        <div className="min-w-0">
+          <h3 id={id} className="text-[15px] font-medium tracking-[-0.01em] text-graphite">
+            {title}
+          </h3>
+          {description && <p className="mt-0.5 text-xs text-slate-600">{description}</p>}
         </div>
       </div>
+      <div className="grid grid-cols-12 gap-x-4 gap-y-5">{children}</div>
+    </section>
+  );
+}
+
+function Field({
+  id,
+  label,
+  required,
+  optional,
+  unit,
+  hint,
+  error,
+  className,
+  children,
+}: {
+  id: string;
+  label: string;
+  required?: boolean;
+  optional?: boolean;
+  unit?: string;
+  hint?: string;
+  error?: string;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className={cn('min-w-0', className)}>
+      <label htmlFor={id} className="field-label">
+        {label}
+        {unit && <span className="sr-only"> ({unit})</span>}
+        {required && (
+          <>
+            <span className="ml-0.5 text-copper-700" aria-hidden>
+              *
+            </span>
+            <span className="sr-only"> (required)</span>
+          </>
+        )}
+        {optional && <span className="ml-1.5 font-normal text-slate-600">Optional</span>}
+      </label>
+      <div className="relative mt-1.5">
+        {children}
+        {unit && (
+          <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center font-mono text-xs text-slate-600" aria-hidden>
+            {unit}
+          </span>
+        )}
+      </div>
+      {hint && (
+        <p id={`${id}-hint`} className="field-hint">
+          {hint}
+        </p>
+      )}
+      {error && (
+        <p id={`${id}-error`} className="field-error">
+          {error}
+        </p>
+      )}
     </div>
   );
 }

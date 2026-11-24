@@ -8,8 +8,11 @@ export function UnreadBadge() {
   const unread = useInbox(organization?.id ?? null).data?.unreadTotal ?? 0;
   if (!unread) return null;
   return (
-    <span className="min-w-[1.25rem] px-1 rounded-full bg-red-600 text-white text-[11px] font-bold leading-5 text-center"
-      aria-label={`${unread} unread messages`}>
+    <span
+      className="inline-flex h-[1.125rem] min-w-[1.125rem] items-center justify-center rounded-xs bg-copper-600 px-1 font-mono text-[10.5px] font-medium tabular-nums leading-none text-white"
+      aria-label={`${unread} unread messages`}
+      role="status"
+    >
       {unread > 99 ? '99+' : unread}
     </span>
   );

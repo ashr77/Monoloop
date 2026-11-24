@@ -5,7 +5,6 @@ import { useMatch } from '@/hooks';
 import { ApiError, errorMessage } from '@/lib/api/client';
 import { MatchResultsView } from './MatchResultsView';
 import { MatchLoadError, MatchSkeleton, RequirementNotFound, RequirementNotOpen } from './MatchStates';
-import { matchMono, matchSans, t } from './theme';
 
 export function MatchDetail({ requirementId }: { requirementId: string }) {
   const query = useMatch(requirementId);
@@ -20,7 +19,7 @@ export function MatchDetail({ requirementId }: { requirementId: string }) {
         ? ((error.details as { requirement_status?: string } | undefined)?.requirement_status ?? 'closed')
         : null;
     return (
-      <div className={`${matchSans.className} ${matchSans.variable} ${matchMono.variable} ${t.page} min-h-[calc(100vh-9rem)]`}>
+      <div className="min-h-[calc(100vh-9rem)] bg-cream font-sans text-graphite">
         {notOpen ? (
           <RequirementNotOpen status={notOpen} />
         ) : (
@@ -33,7 +32,7 @@ export function MatchDetail({ requirementId }: { requirementId: string }) {
   const { result, requirement } = query.data;
   if (!requirement) return <RequirementNotFound />;
   return (
-    <div className={`${matchSans.className} ${matchSans.variable} ${matchMono.variable} ${t.page} min-h-[calc(100vh-9rem)]`}>
+    <div className="min-h-[calc(100vh-9rem)] bg-cream font-sans text-graphite">
       <MatchResultsView requirement={requirement} result={result} />
     </div>
   );

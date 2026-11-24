@@ -1,33 +1,77 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { ArrowRight, Building2, ChevronDown, Cpu, Edit3, Plus, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
-import { Building2, Plus, RefreshCw, Search, Edit3, Cpu, FileText, AlertCircle } from 'lucide-react';
-import { MaterialRequirement, Organization } from '@/lib/types';
-import type { MatchResult } from '@/features/matching/types';
-import { DEMO_ORGANIZATIONS } from '@/lib/constants';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { Fragment, useEffect, useMemo, useState } from 'react';
+import { Collapse, rowMotion } from '@/components/motion';
+import {
+  Button,
+  EmptyState,
+  ErrorState,
+  LinkButton,
+  LoadMore,
+  Menu,
+  MenuCheckItem,
+  MenuLabel,
+  Note,
+  PageHeader,
+  SearchInput,
+  SectionHeading,
+  Segmented,
+  Skeleton,
+  StatusBadge,
+  TableSkeleton,
+  Toast,
+  ToolbarSelect,
+  type ToastMessage,
+  type Tone,
+} from '@/components/ui';
 import { DEMO_BUYER_ORGANIZATIONS } from '@/features/demand/data/demoBuyers';
+import { RequestExchangeButton } from '@/features/exchanges/components/RequestExchangeButton';
+import { SPEC_LABEL, bdt, num } from '@/features/exchanges/components/format';
+import type { MatchResult } from '@/features/matching/types';
+import { useMatch, useOrganizations, useRequirements } from '@/hooks';
+import { sortBy, useIncremental, usePersistentState } from '@/hooks/useViewPrefs';
+import { errorMessage } from '@/lib/api/client';
+import { useIdentity } from '@/lib/auth/AuthProvider';
+import { DEMO_ORGANIZATIONS, MaterialFamily } from '@/lib/constants';
+import { axisLabel } from '@/lib/dimensions';
+import { MaterialRequirement, Organization } from '@/lib/types';
+import { cn } from '@/lib/utils';
 import { BuyerStatsCards } from './BuyerStatsCards';
 import { RequirementFormModal } from './RequirementFormModal';
-import { useOrganizations, useRequirements, useMatch } from '@/hooks';
-import { errorMessage } from '@/lib/api/client';
-import { RequestExchangeButton } from '@/features/exchanges/components/RequestExchangeButton';
-import { useIdentity } from '@/lib/auth/AuthProvider';
+
+type StatusFilter = 'ALL' | 'OPEN' | 'FULFILLED' | 'CANCELLED';
+type SortId = 'newest' | 'oldest' | 'quantity' | 'budget';
+const SORTS: { id: SortId; label: string }[] = [
+  { id: 'newest', label: 'Newest first' },
+  { id: 'oldest', label: 'Oldest first' },
+  { id: 'quantity', label: 'Largest quantity' },
+  { id: 'budget', label: 'Highest budget' },
+];
+const STATUS_TONE: Record<string, Tone> = { OPEN: 'success', FULFILLED: 'copper', CANCELLED: 'muted' };
+const FAMILY_LABEL: Record<string, string> = { STAINLESS_STEEL_SHEET: 'Stainless steel sheet', PLYWOOD_PANEL: 'Plywood panel' };
 
 export function BuyerDemandDashboard() {
   const identity = useIdentity();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [pickedOrgId, setSelectedOrgId] = useState('ALL');
   const selectedOrgId = identity.locked ? identity.organizationId ?? 'ALL' : pickedOrgId;
   const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL');
+  const [familyFilter, setFamilyFilter] = useState<'ALL' | MaterialFamily>('ALL');
+  const [sort, setSort] = usePersistentState<SortId>('demand.sort', 'newest');
+  const [expanded, setExpanded] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<MaterialRequirement | null>(null);
-  const [toast, setToast] = useState('');
+  const [toast, setToast] = useState<ToastMessage | null>(null);
   const [recommendationRequirementId, setRecommendationRequirementId] = useState<string | null>(null);
   const [recommendationOrganizationId, setRecommendationOrganizationId] = useState<string | null>(null);
-  const recommendationQuery = useMatch(
-    recommendationRequirementId || '',
-    recommendationOrganizationId || undefined
-  );
+  const recommendationQuery = useMatch(recommendationRequirementId || '', recommendationOrganizationId || undefined);
 
   // Data comes from the FastAPI backend through cached hooks (src/hooks).
   const orgsQuery = useOrganizations();
@@ -41,7 +85,7 @@ export function BuyerDemandDashboard() {
     selectedOrgId === 'ALL' ? {} : { organization_id: selectedOrgId },
     selectedOrgId === 'ALL' ? undefined : selectedOrgId
   );
-  const requirements = requirementsQuery.data?.items ?? [];
+  const requirements = useMemo(() => requirementsQuery.data?.items ?? [], [requirementsQuery.data]);
   const pendingMatchRequirementIds = requirementsQuery.data?.meta.pending_match_requirement_ids ?? [];
   const fulfilledQuantities = requirementsQuery.data?.meta.fulfilled_quantities_by_requirement ?? {};
   const loading = requirementsQuery.isPending;
@@ -53,355 +97,343 @@ export function BuyerDemandDashboard() {
     setModalOpen(true);
   };
 
+  // "Post a requirement" links elsewhere arrive with ?compose=1.
+  const compose = searchParams.get('compose') === '1';
+  useEffect(() => {
+    if (!compose || identity.mode === 'loading') return;
+    if (!identity.isAdmin) openCreate();
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete('compose');
+    router.replace(`${pathname}${params.size ? `?${params}` : ''}`, { scroll: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [compose, identity.mode, identity.isAdmin]);
+
   const openEdit = (requirement: MaterialRequirement) => {
     setEditing(requirement);
     setModalOpen(true);
   };
 
   const onSaved = (saved: MaterialRequirement) => {
-    setToast(editing ? 'Requirement updated.' : 'Requirement published.');
+    setToast({ kind: 'success', message: editing ? 'Requirement updated.' : 'Requirement published.' });
     if (!editing) {
       setRecommendationRequirementId(saved.id);
       setRecommendationOrganizationId(saved.organization_id);
     }
     fetchRequirements();
-    window.setTimeout(() => setToast(''), 4000);
   };
 
-  const filtered = requirements.filter((requirement) => {
-    const organizationName =
-      requirement.organization?.name ||
-      organizations.find((organization) => organization.id === requirement.organization_id)?.name ||
-      '';
+  const orgName = (r: MaterialRequirement) =>
+    r.organization?.name || organizations.find((organization) => organization.id === r.organization_id)?.name || '';
+
+  const filtered = useMemo(() => {
     const query = searchTerm.toLowerCase();
-    return (
-      !query ||
-      requirement.material_specification.toLowerCase().includes(query) ||
-      organizationName.toLowerCase().includes(query) ||
-      requirement.status.toLowerCase().includes(query)
-    );
-  });
+    const rows = requirements.filter((requirement) => {
+      if (statusFilter !== 'ALL' && requirement.status !== statusFilter) return false;
+      if (familyFilter !== 'ALL' && requirement.material_family !== familyFilter) return false;
+      return (
+        !query ||
+        requirement.material_specification.toLowerCase().includes(query) ||
+        orgName(requirement).toLowerCase().includes(query) ||
+        requirement.status.toLowerCase().includes(query)
+      );
+    });
+    switch (sort) {
+      case 'oldest':
+        return sortBy(rows, (r) => r.created_at, 'asc');
+      case 'quantity':
+        return sortBy(rows, (r) => r.required_quantity, 'desc');
+      case 'budget':
+        return sortBy(rows, (r) => Number(r.maximum_budget_bdt ?? -1), 'desc');
+      default:
+        return sortBy(rows, (r) => r.created_at, 'desc');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [requirements, searchTerm, statusFilter, familyFilter, sort, organizations]);
+
+  const { visible, more, shown, total } = useIncremental(filtered, 12, [searchTerm, statusFilter, familyFilter, sort, selectedOrgId].join('|'));
+  const counts = useMemo(() => {
+    const c = { ALL: requirements.length, OPEN: 0, FULFILLED: 0, CANCELLED: 0 } as Record<StatusFilter, number>;
+    for (const r of requirements) c[r.status as StatusFilter] = (c[r.status as StatusFilter] ?? 0) + 1;
+    return c;
+  }, [requirements]);
+  const anyFilter = searchTerm !== '' || statusFilter !== 'ALL' || familyFilter !== 'ALL';
+  const clearAll = () => {
+    setSearchTerm('');
+    setStatusFilter('ALL');
+    setFamilyFilter('ALL');
+  };
 
   const activeBuyer = organizations.find((organization) => organization.id === selectedOrgId);
+  const pendingSet = new Set(pendingMatchRequirementIds);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-      {toast && (
-        <div className="fixed bottom-6 right-6 z-50 rounded-xl bg-emerald-700 px-4 py-3 text-sm font-medium text-white shadow-lg">
-          {toast}
-        </div>
+    <div className="page-shell pb-20">
+      <Toast toast={toast} onDismiss={() => setToast(null)} />
+
+      <PageHeader
+        eyebrow="Demand · Requirements"
+        title={identity.locked ? 'Your material requirements' : 'Buyer material requirements'}
+        description="Publish exact specifications and find compatible surplus inventory."
+        actions={
+          <>
+            {identity.locked ? (
+              identity.organization && (
+                <span className="inline-flex h-10 items-center gap-2 rounded-sm border border-graphite/15 px-3 text-[13px] font-medium text-graphite">
+                  <Building2 className="size-4 text-slate-500" aria-hidden /> {identity.organization.name}
+                </span>
+              )
+            ) : (
+              <ToolbarSelect
+                label="Buyer"
+                icon={<Building2 className="size-3.5" />}
+                value={selectedOrgId}
+                onChange={(event) => setSelectedOrgId(event.target.value)}
+                className="h-10 max-w-[20rem]"
+              >
+                <option value="ALL">All demo buyers</option>
+                {organizations
+                  .filter((organization) => organization.organization_type === 'BUYER' || organization.organization_type === 'HYBRID')
+                  .map((organization) => (
+                    <option key={organization.id} value={organization.id}>
+                      {organization.name}
+                    </option>
+                  ))}
+              </ToolbarSelect>
+            )}
+            <Button onClick={openCreate} leading={<Plus className="size-4" />}>
+              New requirement
+            </Button>
+          </>
+        }
+      >
+        <BuyerStatsCards
+          requirements={requirements}
+          pendingMatchRequirementIds={pendingMatchRequirementIds}
+          fulfilledQuantities={fulfilledQuantities}
+        />
+      </PageHeader>
+
+      {recommendationRequirementId && (
+        <Recommendations
+          requirementId={recommendationRequirementId}
+          organizationId={recommendationOrganizationId}
+          query={recommendationQuery}
+          onDismiss={() => {
+            setRecommendationRequirementId(null);
+            setRecommendationOrganizationId(null);
+          }}
+        />
       )}
 
-      <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-        <div>
-          <span className="inline-flex rounded-full bg-blue-50 border border-blue-200 px-2.5 py-0.5 text-xs font-semibold text-blue-800">
-            Demand Management
-          </span>
-          <h1 className="mt-2 text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-            Buyer Material Requirements
-          </h1>
-          <p className="mt-1 text-sm text-slate-500">
-            Publish exact specifications and find compatible surplus inventory.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          {identity.locked ? (
-            identity.organization && (
-              <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-100 px-3 py-2 text-xs font-bold text-slate-800">
-                <Building2 className="h-4 w-4 text-slate-500" /> {identity.organization.name}
-              </div>
-            )
-          ) : (
-          <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-100 p-1.5">
-            <Building2 className="ml-1.5 h-4 w-4 text-slate-500" />
-            <select
-              value={selectedOrgId}
-              onChange={(event) => setSelectedOrgId(event.target.value)}
-              className="bg-transparent pr-2 text-xs font-bold text-slate-800 outline-none"
-            >
-              <option value="ALL">All Demo Buyers</option>
-              {organizations
-                .filter((organization) => organization.organization_type === 'BUYER' || organization.organization_type === 'HYBRID')
-                .map((organization) => (
-                  <option key={organization.id} value={organization.id}>
-                    {organization.name}
-                  </option>
-                ))}
-            </select>
-          </div>
-          )}
-          <button
-            type="button"
-            onClick={openCreate}
-            className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-emerald-700"
-          >
-            <Plus className="h-4 w-4" />
-            New Requirement
-          </button>
-        </div>
-      </div>
-
-      <BuyerStatsCards
-        requirements={requirements}
-        pendingMatchRequirementIds={pendingMatchRequirementIds}
-        fulfilledQuantities={fulfilledQuantities}
-      />
-
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <div className="flex flex-col gap-3 border-b border-slate-200 bg-slate-50/50 p-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-2">
-            <h2 className="text-lg font-bold text-slate-900">
-              {activeBuyer ? `${activeBuyer.name} Requirements` : 'Published Requirements'}
+      <section className="space-y-5 pt-8" aria-labelledby="requirements-heading">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div className="space-y-1">
+            <h2 id="requirements-heading" className="text-heading-md font-medium">
+              {activeBuyer ? `${activeBuyer.name} requirements` : 'Published requirements'}
             </h2>
-            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">
-              {requirements.length}
-            </span>
+            <p className="font-mono text-xs text-slate-600">{requirements.length} loaded</p>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <input
-                value={searchTerm}
-                onChange={(event) => setSearchTerm(event.target.value)}
-                placeholder="Search requirements..."
-                className="rounded-lg border border-slate-300 py-2 pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
-              />
-            </div>
-            <button
-              type="button"
-              onClick={fetchRequirements}
-              className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-slate-100"
-              aria-label="Refresh requirements"
-            >
-              <RefreshCw className={`h-4 w-4 ${requirementsQuery.isFetching ? 'animate-spin' : ''}`} />
-            </button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={fetchRequirements}
+            aria-label="Refresh requirements"
+            leading={<RefreshCw className={`size-3.5 ${requirementsQuery.isFetching ? 'animate-spin' : ''}`} />}
+          >
+            Refresh
+          </Button>
+        </div>
+
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="-mx-4 overflow-x-auto px-4 scrollbar-none sm:mx-0 sm:px-0">
+            <Segmented
+              label="Requirement status"
+              variant="tabs"
+              value={statusFilter}
+              onChange={setStatusFilter}
+              options={[
+                { value: 'ALL', label: 'All', count: counts.ALL },
+                { value: 'OPEN', label: 'Open', count: counts.OPEN },
+                { value: 'FULFILLED', label: 'Fulfilled', count: counts.FULFILLED },
+                { value: 'CANCELLED', label: 'Cancelled', count: counts.CANCELLED },
+              ]}
+            />
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <SearchInput value={searchTerm} onChange={setSearchTerm} label="Search requirements" placeholder="Search requirements…" className="w-full sm:w-64" />
+            <ToolbarSelect label="Material family" value={familyFilter} onChange={(e) => setFamilyFilter(e.target.value as 'ALL' | MaterialFamily)}>
+              <option value="ALL">All materials</option>
+              <option value="STAINLESS_STEEL_SHEET">Stainless steel</option>
+              <option value="PLYWOOD_PANEL">Plywood panel</option>
+            </ToolbarSelect>
+            <Menu label="Sort requirements" align="end" width="w-52" trigger={<span>Sort: {SORTS.find((s) => s.id === sort)?.label}</span>}>
+              <MenuLabel>Sort by</MenuLabel>
+              {SORTS.map((s) => (
+                <MenuCheckItem key={s.id} radio checked={sort === s.id} onCheckedChange={() => setSort(s.id)}>
+                  {s.label}
+                </MenuCheckItem>
+              ))}
+            </Menu>
           </div>
         </div>
 
         {loading ? (
-          <div className="p-12 text-center text-sm text-slate-500">
-            <RefreshCw className="mx-auto mb-2 h-7 w-7 animate-spin text-emerald-600" />
-            Loading requirements...
-          </div>
+          <TableSkeleton rows={5} columns={6} label="Loading requirements" />
         ) : loadError ? (
-          <div className="m-4 rounded-xl border border-red-200 bg-red-50 p-6 text-center text-sm text-red-700">
-            <AlertCircle className="mx-auto mb-2 h-6 w-6" />
-            {loadError}
-          </div>
+          <ErrorState title="Requirements could not be loaded" message={loadError} onRetry={fetchRequirements} />
         ) : filtered.length === 0 ? (
-          <div className="p-12 text-center">
-            <FileText className="mx-auto h-8 w-8 text-slate-300" />
-            <p className="mt-3 font-semibold text-slate-700">No material requirements found</p>
-            <p className="mt-1 text-sm text-slate-500">Create your first requirement to start finding supply.</p>
-            <button type="button" onClick={openCreate} className="mt-4 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white">
-              Create Requirement
-            </button>
-          </div>
+          <EmptyState
+            title={anyFilter ? 'No requirements match these filters' : 'No material requirements found'}
+            description={anyFilter ? 'Clear the filters to see every requirement.' : 'Create your first requirement to start finding supply.'}
+            action={
+              anyFilter ? (
+                <Button variant="secondary" onClick={clearAll}>
+                  Clear filters
+                </Button>
+              ) : (
+                <Button onClick={openCreate} leading={<Plus className="size-4" />}>
+                  Create requirement
+                </Button>
+              )
+            }
+          />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse text-left">
-              <thead className="border-b border-slate-200 bg-slate-50 text-[11px] uppercase tracking-wider text-slate-500">
-                <tr>
-                  <th className="px-4 py-3">Material</th>
-                  <th className="px-4 py-3">Dimensions</th>
-                  <th className="px-4 py-3">Quantity</th>
-                  <th className="px-4 py-3">Maximum Budget</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3">Created</th>
-                  <th className="px-4 py-3 text-right">Actions</th>
+          <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+            <table className="w-full min-w-[52rem] border-collapse text-left">
+              <thead>
+                <tr className="border-b border-graphite/15">
+                  <th scope="col" className="w-8 pb-2" aria-label="Expand" />
+                  <th scope="col" className="t-label pb-2 pr-4 font-medium">Material</th>
+                  <th scope="col" className="t-label pb-2 pr-4 font-medium">L × W · thickness (mm)</th>
+                  <th scope="col" className="t-label pb-2 pr-4 text-right font-medium">Quantity</th>
+                  <th scope="col" className="t-label pb-2 pr-4 text-right font-medium">Maximum budget</th>
+                  <th scope="col" className="t-label pb-2 pr-4 font-medium">Status</th>
+                  <th scope="col" className="t-label pb-2 pr-4 font-medium">Created</th>
+                  <th scope="col" className="t-label pb-2 text-right font-medium">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 text-sm text-slate-700">
-                {filtered.map((requirement) => {
-                  const organizationName =
-                    requirement.organization?.name ||
-                    organizations.find((organization) => organization.id === requirement.organization_id)?.name ||
-                    'Unknown buyer';
-                  return (
-                    <tr key={requirement.id} className="hover:bg-slate-50/70">
-                      <td className="px-4 py-4">
-                        <div className="font-bold text-slate-900">{requirement.material_specification}</div>
-                        <div className="mt-0.5 text-xs text-slate-500">
-                          {requirement.material_family === 'STAINLESS_STEEL_SHEET' ? 'Stainless Steel Sheet' : 'Plywood Panel'}
-                        </div>
-                        <div className="mt-0.5 text-[11px] font-medium text-blue-700">{organizationName}</div>
-                      </td>
-                      <td className="px-4 py-4 font-mono text-xs">
-                        {requirement.length_mm ?? (requirement.length_min_mm != null
-                          ? `${requirement.length_min_mm}${requirement.length_max_mm != null ? `-${requirement.length_max_mm}` : '+'}`
-                          : 'Not specified')}
-                        {requirement.width_mm != null || requirement.width_min_mm != null
-                          ? ` × ${requirement.width_mm ?? (requirement.width_min_mm != null ? `${requirement.width_min_mm}${requirement.width_max_mm != null ? `-${requirement.width_max_mm}` : '+'}` : 'Not specified')} mm`
-                          : ''}
-                        <div className="mt-1 text-slate-400">
-                          Thickness: {requirement.thickness_mm ?? (requirement.thickness_min_mm != null
-                            ? `${requirement.thickness_min_mm}${requirement.thickness_max_mm != null ? `-${requirement.thickness_max_mm}` : '+'}`
-                            : 'Not specified')} mm
-                        </div>
-                      </td>
-                      <td className="px-4 py-4">
-                        <span className="font-bold text-slate-900">{requirement.required_quantity}</span> pcs
-                        {requirement.allow_split_suppliers && (
-                          <div className="mt-1 text-[11px] text-emerald-700">Multi-supplier allowed</div>
-                        )}
-                      </td>
-                      <td className="px-4 py-4 font-semibold">
-                        {requirement.maximum_budget_bdt === null || requirement.maximum_budget_bdt === undefined
-                          ? 'Not set'
-                          : `BDT ${Number(requirement.maximum_budget_bdt).toLocaleString()}`}
-                      </td>
-                      <td className="px-4 py-4">
-                        <span className={`rounded-full px-2 py-1 text-[11px] font-bold ${
-                          requirement.status === 'OPEN'
-                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                            : requirement.status === 'FULFILLED'
-                            ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                            : 'bg-slate-100 text-slate-600 border border-slate-200'
-                        }`}>
-                          {requirement.status}
-                        </span>
-                      </td>
-                      <td className="px-4 py-4 text-xs text-slate-500">
-                        {new Date(requirement.created_at).toLocaleDateString()}
-                      </td>
-                      <td className="px-4 py-4">
-                        <div className="flex justify-end gap-2">
-                          {requirement.status === 'OPEN' && (
-                            <button type="button" onClick={() => openEdit(requirement)} title="Edit requirement" className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-slate-100">
-                              <Edit3 className="h-4 w-4" />
+              <tbody className="text-[13px] text-graphite">
+                <AnimatePresence initial={false}>
+                  {visible.map((requirement) => {
+                    const open = expanded === requirement.id;
+                    const name = orgName(requirement) || 'Unknown buyer';
+                    const fulfilled = fulfilledQuantities[requirement.id] ?? 0;
+                    return (
+                      <Fragment key={requirement.id}>
+                        <motion.tr {...rowMotion} className={cn('border-b border-graphite/[0.08] transition-colors duration-fast hover:bg-sand-50', open && 'bg-sand-50')}>
+                          <td className="py-3.5 pr-1 align-top">
+                            <button
+                              type="button"
+                              onClick={() => setExpanded(open ? null : requirement.id)}
+                              aria-expanded={open}
+                              aria-controls={`req-${requirement.id}`}
+                              aria-label={open ? 'Hide requirement details' : 'Show requirement details'}
+                              className="mt-0.5 rounded-xs p-0.5 text-slate-500 hover:bg-graphite/[0.06] hover:text-graphite"
+                            >
+                              <ChevronDown className={cn('size-4 transition-transform duration-base ease-out', open ? 'rotate-0' : '-rotate-90')} />
                             </button>
-                          )}
-                          <Link href={`/matches/${requirement.id}`} className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-2 text-xs font-bold text-white hover:bg-slate-800">
-                            <Cpu className="h-3.5 w-3.5" />
-                            Find Matches
-                          </Link>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
+                          </td>
+                          <td className="py-3.5 pr-4 align-top">
+                            <p className="font-medium">{SPEC_LABEL[requirement.material_specification] ?? requirement.material_specification}</p>
+                            <p className="text-xs text-slate-600">{FAMILY_LABEL[requirement.material_family]}</p>
+                            <p className="max-w-[14rem] truncate text-xs text-copper-700">{name}</p>
+                          </td>
+                          <td className="whitespace-nowrap py-3.5 pr-4 align-top font-mono text-xs">
+                            {axisLabel(requirement, 'length')} × {axisLabel(requirement, 'width')}
+                            <span className="text-slate-600"> · {axisLabel(requirement, 'thickness')}</span>
+                          </td>
+                          <td className="whitespace-nowrap py-3.5 pr-4 text-right align-top tabular-nums">
+                            <span className="font-medium">{num(requirement.required_quantity)}</span> pcs
+                            {requirement.allow_split_suppliers && <p className="text-xs text-slate-600">Multi-supplier allowed</p>}
+                          </td>
+                          <td className="whitespace-nowrap py-3.5 pr-4 text-right align-top tabular-nums">
+                            {requirement.maximum_budget_bdt === null || requirement.maximum_budget_bdt === undefined ? (
+                              <span className="text-slate-600">Not set</span>
+                            ) : (
+                              bdt(Number(requirement.maximum_budget_bdt))
+                            )}
+                          </td>
+                          <td className="py-3.5 pr-4 align-top">
+                            <StatusBadge tone={STATUS_TONE[requirement.status] ?? 'neutral'}>{requirement.status.toLowerCase()}</StatusBadge>
+                            {pendingSet.has(requirement.id) && requirement.status === 'OPEN' && (
+                              <p className="mt-1 text-xs text-copper-700">Exchange proposed</p>
+                            )}
+                          </td>
+                          <td className="whitespace-nowrap py-3.5 pr-4 align-top font-mono text-xs text-slate-600">
+                            {new Date(requirement.created_at).toLocaleDateString()}
+                          </td>
+                          <td className="py-3.5 align-top">
+                            <div className="flex justify-end gap-1.5">
+                              {requirement.status === 'OPEN' && (
+                                <button
+                                  type="button"
+                                  onClick={() => openEdit(requirement)}
+                                  title="Edit requirement"
+                                  aria-label="Edit requirement"
+                                  className="inline-flex size-7 items-center justify-center rounded-sm text-slate-600 hover:bg-graphite/[0.06] hover:text-graphite"
+                                >
+                                  <Edit3 className="size-4" />
+                                </button>
+                              )}
+                              <Link
+                                href={`/matches/${requirement.id}`}
+                                className="inline-flex h-7 items-center gap-1.5 rounded-sm bg-graphite px-2.5 text-xs font-medium text-cream transition-colors hover:bg-graphite-700"
+                              >
+                                <Cpu className="size-3.5" aria-hidden />
+                                Find matches
+                              </Link>
+                            </div>
+                          </td>
+                        </motion.tr>
+                        {open && (
+                          <tr id={`req-${requirement.id}`} className="border-b border-graphite/[0.08] bg-sand-50">
+                            <td />
+                            <td colSpan={7} className="pb-5 pr-4">
+                              <Collapse open={open}>
+                                <dl className="grid grid-cols-2 gap-x-6 gap-y-3 pt-1 text-[13px] md:grid-cols-4">
+                                  {(['length', 'width', 'thickness'] as const).map((axis) => (
+                                    <div key={axis}>
+                                      <dt className="t-label">{axis}</dt>
+                                      <dd className="font-mono">{axisLabel(requirement, axis)} {axisLabel(requirement, axis) === 'any' ? '' : 'mm'}</dd>
+                                    </div>
+                                  ))}
+                                  <div>
+                                    <dt className="t-label">Condition</dt>
+                                    <dd>{requirement.condition_requirement === 'ANY' ? 'Any' : requirement.condition_requirement.toLowerCase()}</dd>
+                                  </div>
+                                  <div>
+                                    <dt className="t-label">Sourcing</dt>
+                                    <dd>{requirement.allow_split_suppliers ? 'Multiple suppliers may combine' : 'Single supplier only'}</dd>
+                                  </div>
+                                  <div>
+                                    <dt className="t-label">Fulfilled so far</dt>
+                                    <dd className="tabular-nums">
+                                      {num(fulfilled)} / {num(requirement.required_quantity)} pcs
+                                    </dd>
+                                  </div>
+                                  <div>
+                                    <dt className="t-label">Buyer</dt>
+                                    <dd className="truncate">{name}</dd>
+                                  </div>
+                                  <div>
+                                    <dt className="t-label">Reference</dt>
+                                    <dd className="font-mono text-xs">{requirement.id.slice(0, 8)}</dd>
+                                  </div>
+                                </dl>
+                              </Collapse>
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
+                    );
+                  })}
+                </AnimatePresence>
               </tbody>
             </table>
           </div>
         )}
-      </div>
-
-      {recommendationRequirementId && (
-        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-emerald-700">Newly created demand</p>
-              <h2 className="mt-1 text-lg font-bold text-slate-900">Recommended Supplies</h2>
-            </div>
-            {recommendationQuery.isFetching && <RefreshCw className="h-4 w-4 animate-spin text-slate-400" />}
-          </div>
-          {recommendationQuery.isPending && (
-            <p className="mt-4 text-sm text-slate-500">Finding compatible available supply...</p>
-          )}
-          {recommendationQuery.isError && (
-            <p className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-              Recommendations could not be loaded.
-            </p>
-          )}
-          {recommendationQuery.data && (() => {
-            const result: MatchResult = recommendationQuery.data.result;
-            const compatible = result.evaluations
-              .filter((evaluation) => evaluation.compatible)
-              .sort((a, b) => b.available_quantity - a.available_quantity || a.unit_price_bdt - b.unit_price_bdt);
-            const combinedAvailable = compatible.reduce((sum, evaluation) => sum + evaluation.available_quantity, 0);
-            const required = result.requested_quantity;
-            const fulfilment = combinedAvailable >= required
-              ? 'Full match available'
-              : combinedAvailable > 0
-                ? `Partial match: ${combinedAvailable}/${required} units available`
-                : 'No compatible supply found';
-
-            return (
-              <div className="mt-4 space-y-4">
-                <div className="flex flex-wrap gap-2">
-                  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700">{fulfilment}</span>
-                  {result.budget.status === 'OVER_BUDGET' && (
-                    <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800">Over budget</span>
-                  )}
-                  {result.budget.status === 'WITHIN_BUDGET' && (
-                    <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-800">Within budget</span>
-                  )}
-                </div>
-
-                {compatible.length === 0 ? (
-                  <p className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-                    No active, available supply listing satisfies every technical requirement.
-                  </p>
-                ) : (
-                  <div className="grid gap-3 md:grid-cols-2">
-                    {compatible.map((evaluation) => {
-                      const allocation = result.allocations.find((item) => item.listing_id === evaluation.listing_id)
-                        ?? result.over_budget_alternative?.find((item) => item.listing_id === evaluation.listing_id);
-                      return (
-                        <article key={evaluation.listing_id} className="rounded-xl border border-slate-200 p-4">
-                          <div className="flex items-start justify-between gap-3">
-                            <div>
-                              <h3 className="font-bold text-slate-900">{evaluation.supplier_name}</h3>
-                              <p className="mt-1 text-xs text-slate-500">{evaluation.material_specification} · {evaluation.dimensions}</p>
-                            </div>
-                            <span className="rounded-full bg-emerald-50 px-2 py-1 text-[11px] font-bold text-emerald-700">Technically compatible</span>
-                          </div>
-                          <dl className="mt-3 grid grid-cols-2 gap-2 text-xs">
-                            <div><dt className="text-slate-500">Available</dt><dd className="font-bold text-slate-900">{evaluation.available_quantity} pcs</dd></div>
-                            <div><dt className="text-slate-500">Unit price</dt><dd className="font-bold text-slate-900">BDT {evaluation.unit_price_bdt.toLocaleString()}</dd></div>
-                            {allocation && (
-                              <>
-                                <div><dt className="text-slate-500">Allocated</dt><dd className="font-bold text-slate-900">{allocation.allocated_quantity} pcs</dd></div>
-                                <div><dt className="text-slate-500">Material cost</dt><dd className="font-bold text-slate-900">BDT {allocation.subtotal_bdt.toLocaleString()}</dd></div>
-                                <div><dt className="text-slate-500">Transport</dt><dd className="font-bold text-slate-900">BDT {allocation.estimated_transport_bdt.toLocaleString()}</dd></div>
-                                <div><dt className="text-slate-500">Distance</dt><dd className="font-bold text-slate-900">{allocation.distance_km} km</dd></div>
-                              </>
-                            )}
-                          </dl>
-                          <p className="mt-3 text-xs text-slate-600">
-                            {allocation
-                              ? allocation.allocated_quantity >= evaluation.available_quantity
-                                ? 'Available stock included in the proposed allocation'
-                                : 'Partial quantity included in the proposed allocation'
-                              : 'Technically compatible; not selected in the cheapest allocation'}
-                          </p>
-                        </article>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {combinedAvailable > 0 && combinedAvailable < required && (
-                  <p className="text-sm font-semibold text-amber-800">
-                    Combined availability: {combinedAvailable}/{required} units. {required - combinedAvailable} units remain unfulfilled.
-                  </p>
-                )}
-                {result.compatibility_explanations.length > 0 && (
-                  <ul className="list-disc space-y-1 pl-5 text-xs text-slate-600">
-                    {result.compatibility_explanations.map((line, index) => (
-                      <li key={`${line}-${index}`}>{line}</li>
-                    ))}
-                  </ul>
-                )}
-                {result.allocations.length > 0 && (
-                  <div className="flex flex-wrap items-center gap-3">
-                    <Link href={`/matches/${recommendationRequirementId}`} className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-xs font-bold text-slate-700">
-                      Review matching details
-                    </Link>
-                    {recommendationOrganizationId && (
-                      <RequestExchangeButton
-                        requirementId={recommendationRequirementId}
-                        buyerOrganizationId={recommendationOrganizationId}
-                        className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-3 py-2 text-xs font-bold text-white hover:bg-slate-800 disabled:opacity-60"
-                      />
-                    )}
-                  </div>
-                )}
-              </div>
-            );
-          })()}
-        </section>
-      )}
+        {!loading && !loadError && <LoadMore shown={shown} total={total} onMore={more} noun="requirements" />}
+      </section>
 
       <RequirementFormModal
         isOpen={modalOpen}
@@ -414,3 +446,173 @@ export function BuyerDemandDashboard() {
     </div>
   );
 }
+
+/* ------------------------------------------------- recommended supplies */
+
+function Recommendations({
+  requirementId,
+  organizationId,
+  query,
+  onDismiss,
+}: {
+  requirementId: string;
+  organizationId: string | null;
+  query: ReturnType<typeof useMatch>;
+  onDismiss: () => void;
+}) {
+  return (
+    <motion.section
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4 }}
+      className="mt-8 border-l-2 border-copper bg-sand-50 px-5 py-6 sm:px-7"
+      aria-labelledby="recommended-heading"
+    >
+      <SectionHeading
+        id="recommended-heading"
+        title="Recommended supplies"
+        hint="For your newly created requirement. Technically compatible listings, checked against every mandatory rule."
+        action={
+          <div className="flex items-center gap-2">
+            {query.isFetching && <RefreshCw className="size-4 animate-spin text-slate-500" aria-label="Refreshing" />}
+            <Button variant="ghost" size="sm" onClick={onDismiss}>
+              Dismiss
+            </Button>
+          </div>
+        }
+      />
+      <div className="mt-5">
+        {query.isPending && (
+          <div className="space-y-3" role="status" aria-label="Finding compatible available supply">
+            <Skeleton className="h-4 w-1/3" />
+            <Skeleton className="h-16 w-full" />
+            <p className="text-sm text-slate-600">Finding compatible available supply…</p>
+          </div>
+        )}
+        {query.isError && <ErrorState title="Recommendations could not be loaded" message={errorMessage(query.error, 'Please try again.')} onRetry={() => void query.refetch()} />}
+        {query.data &&
+          (() => {
+            const result: MatchResult = query.data.result;
+            const compatible = result.evaluations
+              .filter((evaluation) => evaluation.compatible)
+              .sort((a, b) => b.available_quantity - a.available_quantity || a.unit_price_bdt - b.unit_price_bdt);
+            const combinedAvailable = compatible.reduce((sum, evaluation) => sum + evaluation.available_quantity, 0);
+            const required = result.requested_quantity;
+            const fulfilment =
+              combinedAvailable >= required
+                ? { text: 'Full match available', tone: 'success' as const }
+                : combinedAvailable > 0
+                  ? { text: `Partial match: ${combinedAvailable}/${required} units available`, tone: 'warning' as const }
+                  : { text: 'No compatible supply found', tone: 'danger' as const };
+
+            return (
+              <div className="space-y-5">
+                <div className="flex flex-wrap gap-2">
+                  <StatusBadge tone={fulfilment.tone} solid>
+                    {fulfilment.text}
+                  </StatusBadge>
+                  {result.budget.status === 'OVER_BUDGET' && (
+                    <StatusBadge tone="warning" solid>
+                      Over budget
+                    </StatusBadge>
+                  )}
+                  {result.budget.status === 'WITHIN_BUDGET' && (
+                    <StatusBadge tone="success" solid>
+                      Within budget
+                    </StatusBadge>
+                  )}
+                </div>
+
+                {compatible.length === 0 ? (
+                  <p className="text-sm text-slate-700">No active, available supply listing satisfies every technical requirement.</p>
+                ) : (
+                  <ul className="divide-y divide-graphite/10 border-y border-graphite/10">
+                    {compatible.map((evaluation, i) => {
+                      const allocation =
+                        result.allocations.find((item) => item.listing_id === evaluation.listing_id) ??
+                        result.over_budget_alternative?.find((item) => item.listing_id === evaluation.listing_id);
+                      return (
+                        <motion.li
+                          key={evaluation.listing_id}
+                          initial={{ opacity: 0, y: 6 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: i * 0.05 }}
+                          className="grid gap-4 py-4 md:grid-cols-12 md:items-start"
+                        >
+                          <div className="md:col-span-4">
+                            <p className="font-medium text-graphite">{evaluation.supplier_name}</p>
+                            <p className="font-mono text-xs text-slate-600">
+                              {evaluation.material_specification} · {evaluation.dimensions}
+                            </p>
+                            <p className="mt-1 text-xs text-slate-700">
+                              {allocation
+                                ? allocation.allocated_quantity >= evaluation.available_quantity
+                                  ? 'Available stock included in the proposed allocation'
+                                  : 'Partial quantity included in the proposed allocation'
+                                : 'Technically compatible; not selected in the cheapest allocation'}
+                            </p>
+                          </div>
+                          <dl className="grid grid-cols-3 gap-3 text-[13px] md:col-span-8 lg:grid-cols-6">
+                            <Fact label="Available" value={`${evaluation.available_quantity} pcs`} />
+                            <Fact label="Unit price" value={bdt(evaluation.unit_price_bdt)} />
+                            {allocation && (
+                              <>
+                                <Fact label="Allocated" value={`${allocation.allocated_quantity} pcs`} />
+                                <Fact label="Material" value={bdt(allocation.subtotal_bdt)} />
+                                <Fact label="Transport" value={bdt(allocation.estimated_transport_bdt)} />
+                                <Fact label="Distance" value={`${allocation.distance_km} km`} />
+                              </>
+                            )}
+                          </dl>
+                        </motion.li>
+                      );
+                    })}
+                  </ul>
+                )}
+
+                {combinedAvailable > 0 && combinedAvailable < required && (
+                  <Note tone="warning">
+                    Combined availability: {combinedAvailable}/{required} units. {required - combinedAvailable} units remain unfulfilled.
+                  </Note>
+                )}
+                {result.compatibility_explanations.length > 0 && (
+                  <ol className="space-y-1.5">
+                    {result.compatibility_explanations.map((line, index) => (
+                      <li key={`${line}-${index}`} className="flex gap-3 text-[13px] text-slate-700">
+                        <span className="font-mono text-[11px] text-copper-700">{String(index + 1).padStart(2, '0')}</span>
+                        {line}
+                      </li>
+                    ))}
+                  </ol>
+                )}
+                {result.allocations.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-3 pt-1">
+                    <LinkButton href={`/matches/${requirementId}`} variant="secondary" size="sm" trailing={<ArrowRight className="size-3.5" />}>
+                      Review matching details
+                    </LinkButton>
+                    {organizationId && (
+                      <RequestExchangeButton
+                        requirementId={requirementId}
+                        buyerOrganizationId={organizationId}
+                        className="inline-flex h-8 items-center gap-2 rounded-sm bg-copper-600 px-3 text-[13px] font-medium text-white hover:bg-copper-700 disabled:opacity-60"
+                      />
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+      </div>
+    </motion.section>
+  );
+}
+
+function Fact({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0">
+      <dt className="t-label">{label}</dt>
+      <dd className="tabular-nums text-graphite">{value}</dd>
+    </div>
+  );
+}
+

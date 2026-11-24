@@ -1,24 +1,36 @@
 // Loading, empty and error states for the matches pages (Member 3).
-import Link from 'next/link';
 import { ArrowLeft, RotateCw } from 'lucide-react';
-import { t } from './theme';
+import { Button, LinkButton, Skeleton } from '@/components/ui';
 
 export function MatchSkeleton({ label = 'Checking every listing against your specification…' }: { label?: string }) {
   return (
-    <div className="min-h-[calc(100vh-9rem)] bg-[#f3f1e5]">
-      <div className="mx-auto max-w-7xl animate-pulse space-y-10 px-4 py-14 sm:px-6 lg:px-8" aria-busy="true" aria-label="Finding compatible surplus">
-        <div className="space-y-4">
-          <div className="h-3 w-48 bg-[#1d1d1d]/10" />
-          <div className="h-14 w-2/3 bg-[#1d1d1d]/10" />
+    <div className="min-h-[calc(100vh-9rem)] bg-cream">
+      <div className="page-shell space-y-10 py-10 lg:py-14" role="status" aria-busy="true" aria-label="Finding compatible surplus">
+        <div className="space-y-4 border-b rule pb-10">
+          <Skeleton className="h-3 w-48" />
+          <Skeleton className="h-12 w-2/3" />
+          <Skeleton className="h-4 w-1/2" />
         </div>
-        <div className="grid grid-cols-2 gap-px bg-[#d8d4bb] lg:grid-cols-4">
+        <div className="grid grid-cols-2 divide-x divide-graphite/10 border-y rule lg:grid-cols-4">
           {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="h-28 bg-white/70" />
+            <div key={i} className="space-y-3 px-5 py-5">
+              <Skeleton className="h-2.5 w-20" />
+              <Skeleton className="h-7 w-28" />
+              <Skeleton className="h-2.5 w-32" />
+            </div>
           ))}
         </div>
-        <div className="h-12 bg-[#1d1d1d]/10" />
-        <div className="h-64 bg-white/70" />
-        <p className="font-mono text-xs uppercase tracking-[0.08em] text-[#1d1d1d]/50">{label}</p>
+        <Skeleton className="h-12 w-full" />
+        <div className="divide-y divide-graphite/[0.08] border-y rule">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="flex items-center gap-6 py-5" style={{ opacity: 1 - i * 0.15 }}>
+              <Skeleton className="h-4 w-1/3" />
+              <Skeleton className="hidden h-3 flex-1 sm:block" />
+              <Skeleton className="h-3 w-20" />
+            </div>
+          ))}
+        </div>
+        <p className="t-label">{label}</p>
       </div>
     </div>
   );
@@ -26,14 +38,14 @@ export function MatchSkeleton({ label = 'Checking every listing against your spe
 
 export function RequirementNotFound() {
   return (
-    <div className="min-h-[calc(100vh-9rem)] bg-[#f3f1e5] text-[#1d1d1d]">
-      <div className="mx-auto max-w-3xl space-y-6 px-4 py-20 sm:px-6">
-        <p className="font-mono text-[11px] uppercase tracking-[0.08em] text-[#1d1d1d]/60">404 · Requirement</p>
-        <h1 className="text-4xl font-medium tracking-[-0.04em]">This requirement doesn&rsquo;t exist.</h1>
-        <p className="text-base text-[#1d1d1d]/60">It may have been removed, or the link is incomplete.</p>
-        <Link href="/demand" className="inline-flex h-11 items-center bg-[#1d1d1d] px-6 text-sm font-medium text-white transition-colors hover:bg-[#8b5e34]">
+    <div className="min-h-[calc(100vh-9rem)] bg-cream text-graphite">
+      <div className="page-shell max-w-3xl space-y-6 py-20">
+        <p className="t-eyebrow">404 · Requirement</p>
+        <h1 className="text-heading-lg font-medium">This requirement doesn&rsquo;t exist.</h1>
+        <p className="text-[15px] text-slate-600">It may have been removed, or the link is incomplete.</p>
+        <LinkButton href="/demand" variant="ink" leading={<ArrowLeft className="size-4" aria-hidden />}>
           Back to requirements
-        </Link>
+        </LinkButton>
       </div>
     </div>
   );
@@ -41,28 +53,28 @@ export function RequirementNotFound() {
 
 export function RequirementNotOpen({ status }: { status: string }) {
   return (
-    <div className="mx-auto max-w-3xl space-y-6 px-4 py-20 sm:px-6">
-      <p className={`${t.eyebrow} ${t.muted}`}>Matching unavailable</p>
-      <h1 className={`text-4xl ${t.display}`}>This requirement is {status.toLowerCase()}.</h1>
-      <p className={`text-base ${t.muted}`}>
+    <div className="page-shell max-w-3xl space-y-6 py-20">
+      <p className="t-eyebrow">Matching unavailable</p>
+      <h1 className="text-heading-lg font-medium">This requirement is {status.toLowerCase()}.</h1>
+      <p className="max-w-prose text-[15px] leading-relaxed text-slate-600">
         Only open requirements are matched against surplus stock. Reopen it from the demand dashboard to see compatible suppliers.
       </p>
-      <Link href="/demand" className={t.btnInk}>
-        <ArrowLeft className="size-4" /> Back to requirements
-      </Link>
+      <LinkButton href="/demand" variant="ink" leading={<ArrowLeft className="size-4" aria-hidden />}>
+        Back to requirements
+      </LinkButton>
     </div>
   );
 }
 
 export function MatchLoadError({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (
-    <div className="mx-auto max-w-3xl space-y-6 px-4 py-20 sm:px-6" role="alert">
-      <p className={`${t.eyebrow} text-[#b42318]`}>Matching failed</p>
-      <h1 className={`text-4xl ${t.display}`}>We couldn&rsquo;t compute this match.</h1>
-      <p className={`text-base ${t.muted}`}>{message}</p>
-      <button type="button" onClick={onRetry} className={t.btnInk}>
-        <RotateCw className="size-4" /> Try again
-      </button>
+    <div className="page-shell max-w-3xl space-y-6 py-20" role="alert">
+      <p className="t-eyebrow text-brick-700">Matching failed</p>
+      <h1 className="text-heading-lg font-medium">We couldn&rsquo;t compute this match.</h1>
+      <p className="border-l-2 border-brick-600 pl-4 text-[15px] leading-relaxed text-slate-700">{message}</p>
+      <Button variant="ink" onClick={onRetry} leading={<RotateCw className="size-4" aria-hidden />}>
+        Try again
+      </Button>
     </div>
   );
 }
