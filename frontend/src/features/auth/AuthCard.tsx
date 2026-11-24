@@ -6,7 +6,6 @@
 import { motion, useReducedMotion } from 'framer-motion';
 import { AlertTriangle } from 'lucide-react';
 import { useId, type InputHTMLAttributes, type ReactNode } from 'react';
-import { LoopMark } from '@/components/shared/Wordmark';
 import { cn } from '@/lib/utils';
 
 export function AuthCard({ title, subtitle, children, footer }: {
@@ -36,16 +35,56 @@ function BrandPanel() {
     <aside className="relative hidden overflow-hidden bg-graphite text-cream lg:flex lg:flex-col lg:justify-center lg:px-14 lg:py-14 xl:px-20">
       <div className="bg-grid-dark pointer-events-none absolute inset-0" aria-hidden />
       <div className="relative space-y-12">
-        <p className="flex items-center gap-5">
-          <LoopMark inverse className="h-12 w-[4.8rem]" />
-          <span className="text-display-lg font-semibold tracking-[0.1em] text-cream">MEGURI</span>
-        </p>
+        <BrandMark />
         <LoopPath />
         <p className="max-w-lg text-display-md font-medium text-cream">
           One Industry&rsquo;s Surplus. <span className="text-copper-300">Another&rsquo;s Opportunity.</span>
         </p>
       </div>
     </aside>
+  );
+}
+
+const BREATH = { duration: 7, repeat: Infinity, ease: 'easeInOut' } as const;
+
+/**
+ * The large MEGURI mark: letters rise in once, then the two loops slowly breathe toward each
+ * other under a soft copper glow. Static when the user prefers reduced motion.
+ */
+function BrandMark() {
+  const reduce = useReducedMotion();
+  return (
+    <p className="flex items-center gap-5">
+      <span className="sr-only">Meguri</span>
+      <svg viewBox="0 0 64 40" className="h-12 w-[4.8rem] overflow-visible" fill="none" aria-hidden>
+        {!reduce && (
+          <motion.circle
+            cx="32"
+            cy="20"
+            r="16"
+            fill="#C66B3D"
+            style={{ filter: 'blur(10px)', transformOrigin: '32px 20px' }}
+            initial={{ opacity: 0.06, scale: 0.9 }}
+            animate={{ opacity: [0.06, 0.22, 0.06], scale: [0.9, 1.15, 0.9] }}
+            transition={BREATH}
+          />
+        )}
+        <motion.circle cx="20" cy="20" r="17" stroke="#F8F5ED" strokeWidth="4" animate={reduce ? undefined : { x: [0, 3, 0] }} transition={BREATH} />
+        <motion.circle cx="44" cy="20" r="17" stroke="#C66B3D" strokeWidth="4" animate={reduce ? undefined : { x: [0, -3, 0] }} transition={BREATH} />
+      </svg>
+      <span className="flex text-display-lg font-semibold tracking-[0.1em] text-cream" aria-hidden>
+        {'MEGURI'.split('').map((letter, i) => (
+          <motion.span
+            key={i}
+            initial={reduce ? false : { opacity: 0, y: 14, filter: 'blur(6px)' }}
+            animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+            transition={{ delay: 0.2 + i * 0.09, duration: 1, ease: [0.22, 1, 0.36, 1] }}
+          >
+            {letter}
+          </motion.span>
+        ))}
+      </span>
+    </p>
   );
 }
 
