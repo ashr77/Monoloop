@@ -8,9 +8,12 @@ import { homeFor, useAuth } from '@/lib/auth/AuthProvider';
 import { errorMessage } from '@/lib/api/client';
 import { Button } from '@/components/ui';
 import { AuthCard, Field, FormError } from '@/features/auth/AuthCard';
+import { useT } from '@/lib/i18n/I18nProvider';
 
 function LoginForm() {
   const { mode, login } = useAuth();
+  const t = useT();
+  const a = t.auth;
   const router = useRouter();
   const next = useSearchParams().get('next');
   const [email, setEmail] = useState('');
@@ -20,9 +23,9 @@ function LoginForm() {
 
   if (mode === 'demo') {
     return (
-      <AuthCard title="Login is off" subtitle="This server runs in demo mode: use the “Acting as” switchers instead.">
+      <AuthCard title={a.loginOffTitle} subtitle={a.loginOffText}>
         <Link href="/" className="link text-sm">
-          Go to the dashboard →
+          {t.common.goToDashboard}
         </Link>
       </AuthCard>
     );
@@ -37,28 +40,28 @@ function LoginForm() {
       const home = homeFor(profile);
       router.replace(next && home === '/' && next.startsWith('/') && !next.startsWith('//') ? next : home);
     } catch (err) {
-      setError(errorMessage(err, 'Could not sign in.'));
+      setError(errorMessage(err, a.signInFailed));
       setBusy(false);
     }
   }
 
   return (
     <AuthCard
-      title="Sign in"
-      subtitle="One account per company. Supply surplus and post requirements from the same account."
+      title={a.signInTitle}
+      subtitle={a.signInText}
       footer={
         <>
-          New company?{' '}
+          {a.newCompany}{' '}
           <Link href="/signup" className="link">
-            Register with your trade licence
+            {a.registerLink}
           </Link>
         </>
       }
     >
       <form onSubmit={submit} className="space-y-5">
-        <Field label="Email" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+        <Field label={t.common.email} type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
         <Field
-          label="Password"
+          label={t.common.password}
           type="password"
           autoComplete="current-password"
           required
@@ -67,7 +70,7 @@ function LoginForm() {
         />
         <FormError message={error} />
         <Button type="submit" variant="primary" size="lg" busy={busy} leading={<LogIn className="size-4" aria-hidden />} className="w-full">
-          Sign in
+          {t.common.signIn}
         </Button>
       </form>
     </AuthCard>

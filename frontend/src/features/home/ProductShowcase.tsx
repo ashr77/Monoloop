@@ -16,59 +16,36 @@ import { FAMILY_LABEL, SPEC_LABEL, bdt, num } from '@/features/exchanges/compone
 import { RULE_LABELS } from '@/features/matching/types';
 import { useListings, useMatchesOverview } from '@/hooks';
 import { requirementSize } from '@/lib/dimensions';
+import { useT } from '@/lib/i18n/I18nProvider';
 import { cn } from '@/lib/utils';
 
 type Panel = 'market' | 'inventory' | 'requirements' | 'matching' | 'exchange';
 
-const PANELS: { value: Panel; label: string; href: string; cta: string }[] = [
-  {
-    value: 'market',
-    label: 'Marketplace',
-    href: '/supply?scope=all',
-    cta: 'Explore the marketplace',
-  },
-  {
-    value: 'inventory',
-    label: 'Supplier inventory',
-    href: '/supply',
-    cta: 'Manage inventory',
-  },
-  {
-    value: 'requirements',
-    label: 'Buyer requirements',
-    href: '/demand',
-    cta: 'View requirements',
-  },
-  {
-    value: 'matching',
-    label: 'Matching',
-    href: '/matches',
-    cta: 'Open matching',
-  },
-  {
-    value: 'exchange',
-    label: 'Exchange',
-    href: '/exchanges',
-    cta: 'See exchanges',
-  },
+const PANELS: { value: Panel; href: string }[] = [
+  { value: 'market', href: '/supply?scope=all' },
+  { value: 'inventory', href: '/supply' },
+  { value: 'requirements', href: '/demand' },
+  { value: 'matching', href: '/matches' },
+  { value: 'exchange', href: '/exchanges' },
 ];
 
 export function ProductShowcase() {
+  const sc = useT().showcase;
   const [panel, setPanel] = useState<Panel>('market');
-  const meta = PANELS.find((p) => p.value === panel)!;
+  const meta = { ...PANELS.find((p) => p.value === panel)!, ...sc.panels[panel] };
 
   return (
     <div className="grid gap-10 lg:grid-cols-12 lg:gap-14">
       <div className="min-w-0 space-y-8 lg:col-span-4">
         <div className="-mx-4 overflow-x-auto px-4 scrollbar-none lg:mx-0 lg:overflow-visible lg:px-0">
           <Segmented
-            label="Product area"
+            label={sc.area}
             value={panel}
             onChange={setPanel}
-            options={PANELS.map((p) => ({ value: p.value, label: p.label }))}
+            options={PANELS.map((p) => ({ value: p.value, label: sc.panels[p.value].label }))}
             className="lg:hidden"
           />
-          <ul className="hidden space-y-0 lg:block" role="tablist" aria-label="Product area" aria-orientation="vertical">
+          <ul className="hidden space-y-0 lg:block" role="tablist" aria-label={sc.area} aria-orientation="vertical">
             {PANELS.map((p, i) => {
               const active = p.value === panel;
               return (
@@ -87,7 +64,7 @@ export function ProductShowcase() {
                       <motion.span layoutId="showcase-rule" className="absolute -top-px left-0 h-0.5 w-full bg-copper" transition={{ duration: 0.35, ease: EASE_OUT }} />
                     )}
                     <span className="font-mono text-xs text-copper-700">{String(i + 1).padStart(2, '0')}</span>
-                    <span className="text-lg font-medium tracking-[-0.02em]">{p.label}</span>
+                    <span className="text-lg font-medium tracking-[-0.02em]">{sc.panels[p.value].label}</span>
                   </button>
                 </li>
               );
@@ -139,6 +116,7 @@ export function ProductShowcase() {
 /* ------------------------------------------------------------------ frame */
 
 function Frame({ path, children }: { path: string; children: ReactNode }) {
+  const sc = useT().showcase;
   return (
     <div className="overflow-hidden rounded-md border border-graphite/15 bg-cream-paper shadow-float">
       <div className="flex items-center gap-3 border-b border-graphite/10 px-4 py-2.5">
@@ -147,9 +125,9 @@ function Frame({ path, children }: { path: string; children: ReactNode }) {
           <span className="size-2 rounded-full bg-graphite/15" />
           <span className="size-2 rounded-full bg-graphite/15" />
         </span>
-        <span className="truncate font-mono text-xs text-slate-600">monoloop{path.split('?')[0]}</span>
+        <span className="truncate font-mono text-xs text-slate-600">meguri{path.split('?')[0]}</span>
         <span className="ml-auto inline-flex items-center gap-1.5 font-mono text-xs uppercase tracking-[0.08em] text-slate-600">
-          <span className="size-1.5 rounded-full bg-copper" aria-hidden /> Live data
+          <span className="size-1.5 rounded-full bg-copper" aria-hidden /> {sc.liveData}
         </span>
       </div>
       <div className="min-h-[22rem] p-4 sm:p-6">{children}</div>
@@ -158,12 +136,14 @@ function Frame({ path, children }: { path: string; children: ReactNode }) {
 }
 
 function Unavailable({ what }: { what: string }) {
-  return <p className="py-16 text-center text-sm text-slate-600">{what} could not be loaded from the API right now.</p>;
+  const sc = useT().showcase;
+  return <p className="py-16 text-center text-sm text-slate-600">{sc.unavailable(what)}</p>;
 }
 
 function Rows({ n = 5 }: { n?: number }) {
+  const t = useT();
   return (
-    <div className="space-y-4 pt-2" aria-label="Loading" role="status">
+    <div className="space-y-4 pt-2" aria-label={t.common.loading} role="status">
       {Array.from({ length: n }).map((_, i) => (
         <div key={i} className="flex items-center gap-6">
           <Skeleton className="h-4 w-1/3" />
@@ -199,17 +179,18 @@ function useActiveListings() {
 }
 
 function MarketPreview() {
+  const sc = useT().showcase;
   const { q, rows } = useActiveListings();
   if (q.isPending) return <Rows />;
-  if (q.isError) return <Unavailable what="Listings" />;
-  if (rows.length === 0) return <p className="py-16 text-center text-sm text-slate-600">No active listings yet.</p>;
+  if (q.isError) return <Unavailable what={sc.listings} />;
+  if (rows.length === 0) return <p className="py-16 text-center text-sm text-slate-600">{sc.noListings}</p>;
   return (
     <div>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[36rem] text-left text-[14px]">
           <thead>
             <tr className="border-b border-graphite/10">
-              {['Material', 'Size (mm)', 'Available', 'Unit price', 'Location'].map((h, i) => (
+              {sc.columns.map((h, i) => (
                 <th key={h} className={cn('t-label pb-2 font-medium', i < 4 && 'pr-3', i >= 2 && i <= 3 && 'text-right')}>
                   {h}
                 </th>
@@ -240,21 +221,22 @@ function MarketPreview() {
           </tbody>
         </table>
       </div>
-      <ViewAll href="/supply?scope=all" label={`View all ${rows.length} active listings`} />
+      <ViewAll href="/supply?scope=all" label={sc.viewAllListings(rows.length)} />
     </div>
   );
 }
 
 function InventoryPreview() {
+  const sc = useT().showcase;
   const { q, rows } = useActiveListings();
   if (q.isPending) return <Rows n={4} />;
-  if (q.isError) return <Unavailable what="Inventory" />;
+  if (q.isError) return <Unavailable what={sc.inventoryWhat} />;
   // Prefer listings that actually carry reservations: they show the invariant at work.
   const picked = [...rows].sort((a, b) => b.reserved_quantity - a.reserved_quantity || b.total_quantity - a.total_quantity).slice(0, 4);
-  if (picked.length === 0) return <p className="py-16 text-center text-sm text-slate-600">No active listings yet.</p>;
+  if (picked.length === 0) return <p className="py-16 text-center text-sm text-slate-600">{sc.noListings}</p>;
   return (
     <div className="space-y-5">
-      <p className="font-mono text-xs uppercase tracking-[0.08em] text-slate-600">Available = Total − Reserved</p>
+      <p className="font-mono text-xs uppercase tracking-[0.08em] text-slate-600">{sc.invariant}</p>
       <ul className="space-y-5">
         {picked.map((l, i) => {
           const total = Math.max(1, l.total_quantity);
@@ -269,7 +251,7 @@ function InventoryPreview() {
                   {num(l.available_quantity)} / {num(l.total_quantity)}
                 </span>
               </div>
-              <div className="flex h-2 overflow-hidden rounded-xs bg-sand-100" role="img" aria-label={`${l.available_quantity} available, ${l.reserved_quantity} reserved of ${l.total_quantity}`}>
+              <div className="flex h-2 overflow-hidden rounded-xs bg-sand-100" role="img" aria-label={sc.stockAria(l.available_quantity, l.reserved_quantity, l.total_quantity)}>
                 <motion.span
                   className="h-full bg-graphite"
                   initial={{ width: 0 }}
@@ -288,20 +270,21 @@ function InventoryPreview() {
         })}
       </ul>
       <div className="flex gap-5 text-xs text-slate-700">
-        <span className="inline-flex items-center gap-1.5"><span className="size-2 bg-graphite" aria-hidden /> Available</span>
-        <span className="inline-flex items-center gap-1.5"><span className="size-2 bg-copper" aria-hidden /> Reserved by accepted exchanges</span>
+        <span className="inline-flex items-center gap-1.5"><span className="size-2 bg-graphite" aria-hidden /> {sc.available}</span>
+        <span className="inline-flex items-center gap-1.5"><span className="size-2 bg-copper" aria-hidden /> {sc.reservedLegend}</span>
       </div>
-      <ViewAll href="/supply" label="Open supplier inventory" />
+      <ViewAll href="/supply" label={sc.openInventory} />
     </div>
   );
 }
 
 function RequirementsPreview() {
+  const sc = useT().showcase;
   const q = useMatchesOverview();
   if (q.isPending) return <Rows n={4} />;
-  if (q.isError) return <Unavailable what="Requirements" />;
+  if (q.isError) return <Unavailable what={sc.requirementsWhat} />;
   const rows = q.data;
-  if (rows.length === 0) return <p className="py-16 text-center text-sm text-slate-600">No open requirements yet.</p>;
+  if (rows.length === 0) return <p className="py-16 text-center text-sm text-slate-600">{sc.noRequirements}</p>;
   return (
     <div>
       <ul className="divide-y divide-graphite/[0.07]">
@@ -320,24 +303,25 @@ function RequirementsPreview() {
               <p className="truncate font-mono text-xs text-slate-600">{requirementSize(r, '×')}</p>
             </div>
             <div className="flex flex-wrap items-center gap-1.5 sm:justify-end">
-              <Tag>{r.maximum_budget_bdt == null ? 'No budget cap' : `≤ ${bdt(r.maximum_budget_bdt)}`}</Tag>
-              <Tag>{r.allow_split_suppliers ? 'Multi-supplier' : 'Single supplier'}</Tag>
-              <Tag>{r.condition_requirement === 'ANY' ? 'Any condition' : r.condition_requirement.toLowerCase()}</Tag>
+              <Tag>{r.maximum_budget_bdt == null ? sc.noBudgetCap : `≤ ${bdt(r.maximum_budget_bdt)}`}</Tag>
+              <Tag>{r.allow_split_suppliers ? sc.multiSupplier : sc.singleSupplier}</Tag>
+              <Tag>{r.condition_requirement === 'ANY' ? sc.anyCondition : r.condition_requirement.toLowerCase()}</Tag>
             </div>
           </motion.li>
         ))}
       </ul>
-      <ViewAll href="/demand" label={`View all ${rows.length} open requirements`} />
+      <ViewAll href="/demand" label={sc.viewAllRequirements(rows.length)} />
     </div>
   );
 }
 
 function MatchingPreview() {
+  const sc = useT().showcase;
   const q = useMatchesOverview();
   if (q.isPending) return <Rows n={4} />;
-  if (q.isError) return <Unavailable what="Matches" />;
+  if (q.isError) return <Unavailable what={sc.matchesWhat} />;
   const row = q.data.find((o) => o.result.allocations.length > 0) ?? q.data[0];
-  if (!row) return <p className="py-16 text-center text-sm text-slate-600">No open requirements to match yet.</p>;
+  if (!row) return <p className="py-16 text-center text-sm text-slate-600">{sc.noMatches}</p>;
   const { requirement: req, result } = row;
   const evaluation = result.evaluations.find((e) => e.allocated_quantity > 0) ?? result.evaluations[0];
   const pct = Math.round((result.allocated_quantity / Math.max(1, result.requested_quantity)) * 100);
@@ -351,16 +335,14 @@ function MatchingPreview() {
           : ('success' as const);
   const statusText =
     result.budget.status === 'OVER_BUDGET'
-      ? 'Over budget'
-      : { EXACT_MATCH: 'Exact match · one supplier', MULTI_SUPPLIER_MATCH: 'Combined from several suppliers', PARTIAL_MATCH: 'Partial match', NO_MATCH: 'No compatible stock' }[
-          result.matching_status
-        ];
+      ? sc.overBudget
+      : sc.status[result.matching_status];
 
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="t-label">{req.organization?.name ?? 'Buyer requirement'}</p>
+          <p className="t-label">{req.organization?.name ?? sc.buyerRequirement}</p>
           <p className="mt-1 text-lg font-medium tracking-[-0.02em]">
             {num(req.required_quantity)} × {SPEC_LABEL[req.material_specification] ?? req.material_specification}
           </p>
@@ -372,7 +354,7 @@ function MatchingPreview() {
       </div>
       <div>
         <div className="flex justify-between text-xs text-slate-700">
-          <span>Allocated</span>
+          <span>{sc.allocated}</span>
           <span className="font-mono">
             {num(result.allocated_quantity)} / {num(result.requested_quantity)} · {pct}%
           </span>
@@ -384,8 +366,16 @@ function MatchingPreview() {
       {evaluation && (
         <div className="space-y-2">
           <p className="text-[14px] text-slate-700">
-            Why <span className="font-medium text-graphite">{evaluation.supplier_name}</span>&rsquo;s listing{' '}
-            {evaluation.compatible ? 'qualifies' : 'was rejected'}:
+            {(() => {
+              const [before, name, after] = sc.why(evaluation.supplier_name, evaluation.compatible);
+              return (
+                <>
+                  {before}
+                  <span className="font-medium text-graphite">{name}</span>
+                  {after}
+                </>
+              );
+            })()}
           </p>
           <ul className="grid gap-x-6 gap-y-1.5 sm:grid-cols-2">
             {evaluation.checks.map((c, i) => (
@@ -408,7 +398,7 @@ function MatchingPreview() {
                 </span>
                 <span className="min-w-0">
                   <span className="text-graphite">{RULE_LABELS[c.rule]}</span>
-                  <span className="sr-only">{c.passed ? ' passed' : ' failed'}</span>{' '}
+                  <span className="sr-only">{c.passed ? sc.passed : sc.failed}</span>{' '}
                   <span className="font-mono text-xs text-slate-600">{c.actual}</span>
                 </span>
               </motion.li>
@@ -416,19 +406,14 @@ function MatchingPreview() {
           </ul>
         </div>
       )}
-      <ViewAll href={`/matches/${req.id}`} label="Open the full explanation" />
+      <ViewAll href={`/matches/${req.id}`} label={sc.fullExplanation} />
     </div>
   );
 }
 
-const FLOW = [
-  { step: 'Requested', who: 'Buyer', text: 'Requests the proposed allocation. Nothing is reserved yet.' },
-  { step: 'Accepted', who: 'Each supplier', text: 'Accepts or declines its share. Acceptance re-checks and reserves stock in one transaction.' },
-  { step: 'Reserved', who: 'System', text: 'When every supplier has accepted, the exchange is reserved and ready for payment and transfer.' },
-  { step: 'Completed', who: 'Buyer', text: 'Confirms the hand-over. Inventory is deducted exactly once and counted as reuse.' },
-];
 
 function ExchangePreview() {
+  const sc = useT().showcase;
   return (
     <div className="space-y-6">
       <ol className="relative space-y-6 pl-8">
@@ -440,7 +425,7 @@ function ExchangePreview() {
           transition={{ duration: 1.1, ease: EASE_OUT }}
           aria-hidden
         />
-        {FLOW.map((f, i) => (
+        {sc.flow.map((f, i) => (
           <motion.li
             key={f.step}
             className="relative"
@@ -460,7 +445,7 @@ function ExchangePreview() {
         ))}
       </ol>
       <p className="border-t border-graphite/10 pt-4 text-[14px] text-slate-700">
-        A supplier can decline; the buyer then cancels to release any stock others reserved. Cancelling never deducts inventory.
+        {sc.flowNote}
       </p>
     </div>
   );

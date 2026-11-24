@@ -5,8 +5,10 @@ import { useListings, useMatchesOverview } from '@/hooks';
 import { Skeleton } from '@/components/ui';
 import { num } from '@/features/exchanges/components/format';
 import { useIdentity } from '@/lib/auth/AuthProvider';
+import { useT } from '@/lib/i18n/I18nProvider';
 
 export function LivePulse() {
+  const h = useT().home;
   const identity = useIdentity();
   // Signed-in companies only receive their own requirements from the API.
   const own = identity.locked && !identity.isAdmin;
@@ -19,18 +21,18 @@ export function LivePulse() {
   const fulfillable = rows.filter((r) => r.result.unfulfilled_quantity === 0 && r.result.allocations.length > 0).length;
 
   const items: { label: string; value: string | null; loading: boolean; failed: boolean }[] = [
-    { label: 'Active surplus listings', value: num(active.length), loading: listings.isPending, failed: listings.isError },
-    { label: 'Pieces available now', value: num(pieces), loading: listings.isPending, failed: listings.isError },
-    { label: own ? 'Your open requirements' : 'Open buyer requirements', value: num(rows.length), loading: overview.isPending, failed: overview.isError },
-    { label: own ? 'Yours fulfillable now' : 'Fulfillable right now', value: num(fulfillable), loading: overview.isPending, failed: overview.isError },
+    { label: h.activeListings, value: num(active.length), loading: listings.isPending, failed: listings.isError },
+    { label: h.piecesAvailable, value: num(pieces), loading: listings.isPending, failed: listings.isError },
+    { label: own ? h.yourOpenRequirements : h.openRequirements, value: num(rows.length), loading: overview.isPending, failed: overview.isError },
+    { label: own ? h.yoursFulfillable : h.fulfillable, value: num(fulfillable), loading: overview.isPending, failed: overview.isError },
   ];
   const allFailed = listings.isError && overview.isError;
 
   return (
-    <section aria-label="Live network figures" className="border-y border-graphite/10">
+    <section aria-label={h.liveFigures} className="border-y border-graphite/10">
       <div className="page-shell flex flex-col gap-4 py-5 lg:flex-row lg:items-center lg:gap-10">
         {allFailed ? (
-          <p className="text-sm text-slate-600">Live figures are unavailable right now — the Meguri API could not be reached.</p>
+          <p className="text-sm text-slate-600">{h.liveUnavailable}</p>
         ) : (
           <dl className="grid flex-1 grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4">
             {items.map((it) => (
