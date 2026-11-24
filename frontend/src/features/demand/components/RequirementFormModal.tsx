@@ -12,6 +12,7 @@ import { useExtractRequirement, useSaveRequirement } from '@/hooks';
 import { errorMessage } from '@/lib/api/client';
 import { RequirementExtractionResult } from '@/lib/ai/schemas';
 import { useIdentity } from '@/lib/auth/AuthProvider';
+import { VoiceInputControl } from '@/features/supply/components/VoiceInputControl';
 
 interface Props {
   isOpen: boolean;
@@ -158,6 +159,12 @@ export function RequirementFormModal({
     setAllowSplit(aiResult.allow_split_suppliers);
   };
 
+  // Voice input: append each finished piece of speech to the prompt for review before extraction.
+  const appendTranscript = (text: string) => {
+    setAiPrompt((prev) => (prev.trim() ? `${prev.trimEnd()} ${text}` : text).slice(0, 2000));
+    setAiMessage('');
+  };
+
   const loadSample = () => {
     setAiPrompt(
       'I need around 100 pieces of SS304 stainless steel sheets. Length should be between 1500 and 2000 mm, width between 800 and 1000 mm, and thickness can be 2 to 3 mm. The material should be in good condition.'
@@ -281,7 +288,8 @@ export function RequirementFormModal({
                   Assist · AI Smart Material Requirement Assistant
                 </p>
                 <p className="text-sm leading-relaxed text-slate-700">
-                  Describe the materials your business needs in plain language. Our AI extracts material specifications,
+                  Describe the materials your business needs in plain language, typed or spoken in English, Bangla or
+                  Japanese. Our AI extracts material specifications,
                   acceptable dimensions, and required quantities into an editable form for your review.
                 </p>
                 <p className="text-xs text-slate-600">
@@ -304,6 +312,8 @@ export function RequirementFormModal({
                   className="field mt-1.5 resize-y leading-relaxed"
                 />
               </div>
+
+              <VoiceInputControl onTranscript={appendTranscript} disabled={isExtracting} />
 
               <div className="flex flex-wrap items-center gap-2 border-t rule pt-4">
                 <span className="t-label mr-1">Try a sample</span>
