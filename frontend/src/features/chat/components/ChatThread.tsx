@@ -1,12 +1,14 @@
 'use client';
 
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useId, useLayoutEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Send, Loader2, AlertCircle, Building2, MapPin, MessageCircle, ShoppingCart, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, MapPin, MessageCircle, Send, ShoppingCart } from 'lucide-react';
 import { useConversationThread } from '@/hooks';
 import { errorMessage } from '@/lib/api/client';
 import { ListingOrderDialog } from '@/features/supply/components/ListingOrderDialog';
+import { Button, EmptyState, ErrorState, Skeleton, Tag } from '@/components/ui';
+import { cn } from '@/lib/utils';
 import type { ChatMessage } from '../types';
 
 interface Props {
@@ -27,6 +29,7 @@ export function ChatThread({ conversationId, organizationId }: Props) {
   const [ordered, setOrdered] = useState(false);
   const scroller = useRef<HTMLDivElement>(null);
   const nearBottom = useRef(true);
+  const composerId = useId();
 
   // Keep the newest message in view unless the reader scrolled up to read history.
   useLayoutEffect(() => {
@@ -35,21 +38,54 @@ export function ChatThread({ conversationId, organizationId }: Props) {
   }, [messages.length]);
 
   if (!organizationId) {
-    return <Notice>Choose who you are on the Messages page first.</Notice>;
+    return (
+      <Shell>
+        <EmptyState
+          icon={<MessageCircle className="size-6" aria-hidden />}
+          title="No company selected"
+          description="Choose who you are on the Messages page first."
+          action={
+            <Link href="/messages" className="link text-sm">
+              Go to Messages
+            </Link>
+          }
+        />
+      </Shell>
+    );
   }
   if (query.isError && !view) {
     return (
-      <Notice tone="error">
-        {errorMessage(query.error, 'Could not load this chat.')}{' '}
-        <Link href="/messages" className="font-semibold underline">Back to messages</Link>
-      </Notice>
+      <Shell>
+        <ErrorState
+          title="Could not load this chat"
+          message={
+            <>
+              {errorMessage(query.error, 'Could not load this chat.')}{' '}
+              <Link href="/messages" className="link">
+                Back to messages
+              </Link>
+            </>
+          }
+        />
+      </Shell>
     );
   }
   if (!view) {
     return (
-      <div className="flex items-center justify-center py-24 text-slate-500 gap-2">
-        <Loader2 className="w-5 h-5 animate-spin" /> Loading chat…
-      </div>
+      <Shell>
+        <div role="status" aria-label="Loading chat" className="space-y-8 pt-10">
+          <div className="space-y-3 border-b rule pb-8">
+            <Skeleton className="h-3 w-48" />
+            <Skeleton className="h-8 w-80 max-w-full" />
+          </div>
+          <div className="space-y-4">
+            <Skeleton className="h-12 w-2/3 max-w-sm" />
+            <Skeleton className="ml-auto h-12 w-1/2 max-w-xs" />
+            <Skeleton className="h-12 w-3/5 max-w-sm" />
+          </div>
+          <span className="sr-only">Loading chat…</span>
+        </div>
+      </Shell>
     );
   }
 
@@ -63,15 +99,18 @@ export function ChatThread({ conversationId, organizationId }: Props) {
   };
 
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <Link href="/messages" className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-600 hover:text-slate-900">
-          <ArrowLeft className="w-4 h-4" /> All messages
+    <Shell>
+      <div className="flex flex-wrap items-center justify-between gap-3 pt-6">
+        <Link
+          href="/messages"
+          className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-700 transition-colors duration-fast hover:text-graphite"
+        >
+          <ArrowLeft className="size-4" aria-hidden /> All messages
         </Link>
         {/* Demo identity: flip between the two companies in this chat */}
-        <div className="flex items-center gap-2 text-sm">
-          <span className="text-slate-500">Viewing as</span>
-          <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="t-label">Viewing as</span>
+          <div role="group" aria-label="Viewing as" className="inline-flex gap-0.5 rounded-sm border border-graphite/15 bg-cream-paper p-0.5">
             {[view.buyer, view.supplier].map((org, i) =>
               org ? (
                 <button
@@ -79,9 +118,10 @@ export function ChatThread({ conversationId, organizationId }: Props) {
                   type="button"
                   onClick={() => router.replace(`/messages/${conversationId}?as=${org.id}`)}
                   aria-pressed={org.id === organizationId}
-                  className={`px-3 py-1.5 rounded-md font-semibold transition ${
-                    org.id === organizationId ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'
-                  }`}
+                  className={cn(
+                    'h-7 rounded-xs px-2.5 text-xs font-medium transition-colors duration-fast',
+                    org.id === organizationId ? 'bg-graphite text-cream' : 'text-slate-600 hover:text-graphite'
+                  )}
                 >
                   {i === 0 ? 'Buyer' : 'Supplier'}: {shortName(org.name)}
                 </button>
@@ -92,82 +132,89 @@ export function ChatThread({ conversationId, organizationId }: Props) {
       </div>
 
       {/* The listing this chat is about */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="min-w-0">
-          <p className="text-sm text-slate-500 flex flex-wrap items-center gap-1.5">
-            <Building2 className="w-4 h-4" />
-            {view.role === 'BUYER' ? 'Chatting with supplier' : 'Chatting with buyer'}
-            <span className="font-bold text-slate-900">{shortName(view.counterpart?.name)}</span>
+      <header className="flex flex-col gap-6 border-b rule pb-8 pt-8 md:flex-row md:items-end md:justify-between">
+        <div className="min-w-0 space-y-2">
+          <p className="t-eyebrow flex flex-wrap items-center gap-x-2 gap-y-1">
+            <span>{view.role === 'BUYER' ? 'Chatting with supplier' : 'Chatting with buyer'}</span>
+            <span className="text-graphite">{shortName(view.counterpart?.name)}</span>
             {view.counterpart && (
-              <span className="flex items-center gap-1 text-slate-400">
-                <MapPin className="w-3.5 h-3.5" /> {view.counterpart.city}
+              <span className="inline-flex items-center gap-1">
+                <MapPin className="size-3" aria-hidden /> {view.counterpart.city}
               </span>
             )}
           </p>
           {listing && (
-            <h1 className="text-xl font-extrabold text-slate-900 mt-1">
-              {listing.material_specification}
-              <span className="font-medium text-slate-500">
-                {' '}· {listing.length_mm} × {listing.width_mm} × {listing.thickness_mm} mm · {listing.condition}
-              </span>
-            </h1>
+            <>
+              <h1 className="text-heading-md font-medium sm:text-[1.75rem] sm:leading-tight">{listing.material_specification}</h1>
+              <p className="flex flex-wrap items-center gap-2 text-sm text-slate-600">
+                <span className="font-mono text-xs">
+                  {listing.length_mm} × {listing.width_mm} × {listing.thickness_mm} mm
+                </span>
+                <Tag>{listing.condition}</Tag>
+              </p>
+            </>
           )}
         </div>
         {listing && (
-          <div className="flex items-center gap-6 shrink-0">
-            <div className="text-right">
-              <p className="text-xs uppercase tracking-wide text-slate-500">Price</p>
-              <p className="text-lg font-extrabold text-slate-900">
-                BDT {listing.unit_price_bdt.toLocaleString()}
-                <span className="text-sm font-medium text-slate-400"> /pc</span>
-              </p>
-            </div>
-            <div className="text-right">
-              <p className="text-xs uppercase tracking-wide text-slate-500">Available</p>
-              <p className="text-lg font-extrabold text-emerald-700">{listing.available_quantity} pcs</p>
-            </div>
+          <div className="flex shrink-0 flex-wrap items-end gap-6">
+            <dl className="flex gap-6">
+              <div>
+                <dt className="t-label">Price</dt>
+                <dd className="text-lg font-medium tabular-nums text-graphite">
+                  BDT {listing.unit_price_bdt.toLocaleString()}
+                  <span className="text-sm font-normal text-slate-600"> /pc</span>
+                </dd>
+              </div>
+              <div>
+                <dt className="t-label">Available</dt>
+                <dd className="text-lg font-medium tabular-nums text-graphite">{listing.available_quantity} pcs</dd>
+              </div>
+            </dl>
             {view.role === 'BUYER' && (
-              <button
-                type="button"
+              <Button
+                variant="primary"
                 onClick={() => setOrdering(true)}
                 disabled={!canOrder}
                 title={canOrder ? 'Order from this listing' : 'This listing has no stock available'}
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                leading={<ShoppingCart className="size-4" aria-hidden />}
               >
-                <ShoppingCart className="w-4 h-4" /> Place order
-              </button>
+                Place order
+              </Button>
             )}
           </div>
         )}
-      </div>
+      </header>
 
       {ordered && (
-        <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900 flex items-center gap-2" role="status">
-          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-          Order request sent. The supplier accepts or rejects it on the{' '}
-          <Link href={`/exchanges?as=${organizationId}`} className="font-semibold underline">Exchanges</Link> page.
+        <p className="mt-6 flex items-start gap-2 border-l-2 border-moss-600 py-1 pl-4 text-sm text-graphite" role="status">
+          <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-moss-600" aria-hidden />
+          <span>
+            Order request sent. The supplier accepts or rejects it on the{' '}
+            <Link href={`/exchanges?as=${organizationId}`} className="link">
+              Exchanges
+            </Link>{' '}
+            page.
+          </span>
         </p>
       )}
 
       {/* Thread */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col">
+      <section aria-label="Conversation" className="mt-6 flex flex-col border-b rule">
         <div
           ref={scroller}
           onScroll={(e) => {
             const el = e.currentTarget;
             nearBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
           }}
-          className="h-[55vh] min-h-[20rem] overflow-y-auto px-4 sm:px-6 py-5 space-y-4"
+          className="h-[55vh] min-h-[20rem] space-y-5 overflow-y-auto py-6 pr-1"
           aria-live="polite"
         >
           {messages.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center text-center text-slate-500 gap-2">
-              <MessageCircle className="w-8 h-8 text-slate-300" />
-              <p className="text-base font-semibold text-slate-700">Start the conversation</p>
-              <p className="text-sm max-w-sm">
-                {view.role === 'BUYER'
-                  ? 'Ask about condition, delivery or cutting before you order.'
-                  : 'The buyer has not written yet.'}
+            <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
+              <MessageCircle className="size-6 text-copper-600" aria-hidden />
+              <p className="text-base font-medium text-graphite">Start the conversation</p>
+              <p className="max-w-sm text-sm text-slate-600">
+                {view.role === 'BUYER' ? 'Ask about condition, delivery or cutting before you order.' : 'The buyer has not written yet.'}
               </p>
             </div>
           ) : (
@@ -180,15 +227,19 @@ export function ChatThread({ conversationId, organizationId }: Props) {
             e.preventDefault();
             submit();
           }}
-          className="border-t border-slate-200 p-4 space-y-2"
+          className="space-y-2 border-t rule py-4"
         >
           {send.isError && (
-            <p className="text-sm text-red-700 flex items-start gap-1.5" role="alert">
-              <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" /> {errorMessage(send.error, 'Message not sent.')}
+            <p className="field-error mt-0" role="alert">
+              {errorMessage(send.error, 'Message not sent.')}
             </p>
           )}
+          <label htmlFor={composerId} className="sr-only">
+            Message
+          </label>
           <div className="flex items-end gap-2">
             <textarea
+              id={composerId}
               value={draft}
               onChange={(e) => setDraft(e.target.value.slice(0, 2000))}
               onKeyDown={(e) => {
@@ -199,20 +250,23 @@ export function ChatThread({ conversationId, organizationId }: Props) {
               }}
               rows={1}
               placeholder="Write a message… (Enter to send, Shift+Enter for a new line)"
-              aria-label="Message"
-              className="flex-1 resize-none px-4 py-3 rounded-xl border border-slate-300 text-base focus:outline-none focus:ring-2 focus:ring-emerald-500 max-h-40"
+              className="field max-h-40 min-h-[2.75rem] flex-1 resize-none py-2.5 text-[15px]"
             />
-            <button
+            <Button
               type="submit"
-              disabled={!draft.trim() || send.isPending}
+              variant="primary"
+              size="md"
+              className="h-11"
+              disabled={!draft.trim()}
+              busy={send.isPending}
               aria-label="Send message"
-              className="shrink-0 p-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-40"
+              leading={<Send className="size-4" aria-hidden />}
             >
-              {send.isPending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
-            </button>
+              <span className="hidden sm:inline">Send</span>
+            </Button>
           </div>
         </form>
-      </div>
+      </section>
 
       {ordering && listing && (
         <ListingOrderDialog
@@ -226,36 +280,28 @@ export function ChatThread({ conversationId, organizationId }: Props) {
           }}
         />
       )}
-    </div>
+    </Shell>
   );
+}
+
+function Shell({ children }: { children: React.ReactNode }) {
+  return <div className="mx-auto w-full max-w-4xl px-4 pb-16 sm:px-6 lg:px-8">{children}</div>;
 }
 
 function Bubble({ message, mine }: { message: ChatMessage; mine: boolean }) {
   return (
-    <div className={`flex flex-col ${mine ? 'items-end' : 'items-start'}`}>
+    <div className={cn('flex flex-col', mine ? 'items-end' : 'items-start')}>
       <p
-        className={`max-w-[80%] whitespace-pre-wrap break-words rounded-2xl px-4 py-2.5 text-base ${
-          mine ? 'bg-emerald-600 text-white rounded-br-md' : 'bg-slate-100 text-slate-900 rounded-bl-md'
-        }`}
+        className={cn(
+          'max-w-[80%] whitespace-pre-wrap break-words rounded-md px-4 py-2.5 text-[15px] leading-relaxed',
+          mine ? 'rounded-br-xs bg-graphite text-cream' : 'rounded-bl-xs border border-graphite/10 bg-cream-paper text-graphite'
+        )}
       >
         {message.body}
       </p>
-      <span className="text-xs text-slate-400 mt-1">{time(message.created_at)}</span>
-    </div>
-  );
-}
-
-function Notice({ children, tone = 'info' }: { children: React.ReactNode; tone?: 'info' | 'error' }) {
-  return (
-    <div className="max-w-3xl mx-auto px-4 py-16">
-      <p
-        className={`rounded-xl border p-6 text-center text-sm ${
-          tone === 'error' ? 'border-red-200 bg-red-50 text-red-700' : 'border-slate-200 bg-white text-slate-600'
-        }`}
-        role={tone === 'error' ? 'alert' : undefined}
-      >
-        {children}
-      </p>
+      <time dateTime={message.created_at} className="mt-1 font-mono text-[11px] tabular-nums text-slate-600">
+        {time(message.created_at)}
+      </time>
     </div>
   );
 }

@@ -28,20 +28,23 @@ export const dims = (l?: { length_mm: number; width_mm: number; thickness_mm: nu
 export const formatDate = (iso: string) =>
   new Date(iso).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 
-export const STAGE_META: Record<ExchangeStage, { label: string; className: string }> = {
-  AWAITING_SUPPLIERS: { label: 'Awaiting suppliers', className: 'bg-amber-50 text-amber-800 border-amber-200' },
-  SUPPLIER_DECLINED: { label: 'Supplier declined', className: 'bg-red-50 text-red-800 border-red-200' },
-  RESERVED: { label: 'Stock reserved', className: 'bg-blue-50 text-blue-800 border-blue-200' },
-  COMPLETED: { label: 'Completed', className: 'bg-emerald-50 text-emerald-800 border-emerald-200' },
-  CANCELLED: { label: 'Cancelled', className: 'bg-slate-100 text-slate-600 border-slate-200' },
+/** Status tone for <StatusBadge> (Industrial Copper: moss / ochre / brick / copper / slate only). */
+export type StatusTone = 'neutral' | 'copper' | 'success' | 'warning' | 'danger' | 'info' | 'muted';
+
+export const STAGE_META: Record<ExchangeStage, { label: string; className: string; tone: StatusTone }> = {
+  AWAITING_SUPPLIERS: { label: 'Awaiting suppliers', className: 'text-ochre-700', tone: 'warning' },
+  SUPPLIER_DECLINED: { label: 'Supplier declined', className: 'text-brick-700', tone: 'danger' },
+  RESERVED: { label: 'Stock reserved', className: 'text-copper-700', tone: 'copper' },
+  COMPLETED: { label: 'Completed', className: 'text-moss-700', tone: 'success' },
+  CANCELLED: { label: 'Cancelled', className: 'text-slate-600', tone: 'muted' },
 };
 
-export const ITEM_STATUS_META: Record<string, { label: string; className: string }> = {
-  PENDING: { label: 'Pending', className: 'text-amber-700' },
-  ACCEPTED: { label: 'Accepted · reserved', className: 'text-blue-700' },
-  REJECTED: { label: 'Declined', className: 'text-red-700' },
-  CANCELLED: { label: 'Cancelled · released', className: 'text-slate-500' },
-  COMPLETED: { label: 'Transferred', className: 'text-emerald-700' },
+export const ITEM_STATUS_META: Record<string, { label: string; className: string; tone: StatusTone }> = {
+  PENDING: { label: 'Pending', className: 'text-ochre-700', tone: 'warning' },
+  ACCEPTED: { label: 'Accepted · reserved', className: 'text-copper-700', tone: 'copper' },
+  REJECTED: { label: 'Declined', className: 'text-brick-700', tone: 'danger' },
+  CANCELLED: { label: 'Cancelled · released', className: 'text-slate-600', tone: 'muted' },
+  COMPLETED: { label: 'Transferred', className: 'text-moss-700', tone: 'success' },
 };
 
 export const ACTIVITY_LABEL: Record<string, string> = {

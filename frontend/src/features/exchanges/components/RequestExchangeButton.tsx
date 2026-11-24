@@ -9,6 +9,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { ArrowRight, Loader2 } from 'lucide-react';
+import { buttonVariants } from '@/components/ui';
+import { cn } from '@/lib/utils';
 import { useRequestExchange } from '@/hooks';
 import { ApiError } from '@/lib/api/client';
 
@@ -40,16 +42,22 @@ export function RequestExchangeButton({ requirementId, buyerOrganizationId, clas
 
   return (
     <div className="flex flex-col items-start gap-2 sm:items-end">
-      <button type="button" onClick={submit} disabled={pending} className={className} aria-busy={pending}>
-        {pending ? <Loader2 className="size-4 animate-spin" /> : null}
+      <button
+        type="button"
+        onClick={submit}
+        disabled={pending}
+        className={cn(className ?? buttonVariants({ variant: 'primary', size: 'md' }), 'aria-busy:cursor-progress')}
+        aria-busy={pending || undefined}
+      >
+        {pending ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
         {pending ? 'Sending request…' : 'Request exchange'}
-        {!pending && <ArrowRight className="size-4" />}
+        {!pending && <ArrowRight className="size-4" aria-hidden />}
       </button>
       {error && (
-        <p role="alert" className="max-w-xs text-sm text-red-700">
+        <p role="alert" className="max-w-xs border-l-2 border-brick-600 pl-3 text-sm text-brick-700">
           {error.message}{' '}
           {error.code === 'DUPLICATE_EXCHANGE' && (
-            <Link href={`/exchanges?as=${buyerOrganizationId}`} className="font-semibold underline">
+            <Link href={`/exchanges?as=${buyerOrganizationId}`} className="link">
               View it
             </Link>
           )}

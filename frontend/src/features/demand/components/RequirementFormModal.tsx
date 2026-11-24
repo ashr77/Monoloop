@@ -1,7 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { X, Save, Sparkles, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { Save, Sparkles, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Button, Dialog, ErrorState, Note } from '@/components/ui';
+import { cn } from '@/lib/utils';
 import { MaterialRequirement, Organization } from '@/lib/types';
 import { DEMO_ORGANIZATIONS, MATERIAL_FAMILIES, MATERIAL_SPECIFICATIONS } from '@/lib/constants';
 import { DEMO_BUYER_ORGANIZATIONS } from '@/features/demand/data/demoBuyers';
@@ -31,6 +33,9 @@ export function RequirementFormModal({
   const identity = useIdentity();
   const saveRequirement = useSaveRequirement();
   const extractRequirement = useExtractRequirement();
+  const uid = useId();
+  const formId = `${uid}-form`;
+  const formRef = useRef<HTMLFormElement>(null);
   const buyers = organizations.filter(
     (organization) =>
       organization.organization_type === 'BUYER' ||
@@ -70,6 +75,12 @@ export function RequirementFormModal({
   const [generalError, setGeneralError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
+  // After a failed validation, move focus to the first field that needs attention.
+  useEffect(() => {
+    if (Object.keys(errors).length === 0) return;
+    formRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus();
+  }, [errors]);
+
   useEffect(() => {
     if (!isOpen) return;
     setOrganizationId(
@@ -101,7 +112,6 @@ export function RequirementFormModal({
     setGeneralError('');
   }, [isOpen, initialData, selectedOrgId]);
 
-  if (!isOpen) return null;
 
   const onFamilyChange = (value: (typeof MATERIAL_FAMILIES)[number]) => {
     setFamily(value);
@@ -231,161 +241,441 @@ export function RequirementFormModal({
     }
   };
 
-  const fieldClass = 'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500';
+  const fieldId = (name: string) => `${uid}-${name}`;
+  const isEditing = Boolean(initialData);
+  const steps = isEditing
+    ? { assist: '', material: '01', dimensions: '02', quantity: '03' }
+    : { assist: '01', material: '02', dimensions: '03', quantity: '04' };
 
   return (
-    <div className="fixed inset-0 z-[60] bg-slate-900/40 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[92vh] overflow-y-auto">
-        <div className="sticky top-0 z-10 bg-white border-b border-slate-200 px-5 py-4 flex items-center justify-between">
-          <div>
-            <h2 className="text-lg font-bold text-slate-900">
-              {initialData ? 'Edit Requirement' : 'New Material Requirement'}
-            </h2>
-            <p className="text-xs text-slate-500">All dimensions are in millimeters.</p>
-          </div>
-          <button type="button" onClick={onClose} className="p-2 rounded-lg text-slate-500 hover:bg-slate-100" aria-label="Close">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-        <form onSubmit={submit} className="p-5 space-y-5">
-          {generalError && <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{generalError}</div>}
-          {!initialData && (
-            <section className="rounded-xl border border-emerald-200 bg-emerald-50/40 p-4 space-y-3">
-              <div className="flex items-center gap-2">
-                <Sparkles className="h-5 w-5 text-emerald-700" />
-                <h3 className="font-bold text-slate-900">AI Smart Material Requirement Assistant</h3>
+    <Dialog
+      open={isOpen}
+      onClose={onClose}
+      size="lg"
+      dismissible={!submitting}
+      eyebrow={initialData ? 'Demand · Edit requirement' : 'Demand · New requirement'}
+      title={initialData ? 'Edit Requirement' : 'New Material Requirement'}
+      description="All dimensions are in millimeters."
+      footer={
+        <>
+          {Object.keys(errors).length > 0 && (
+            <p className="mr-auto text-xs font-medium text-brick-700">Check the highlighted fields before saving.</p>
+          )}
+          <Button variant="secondary" onClick={onClose} disabled={submitting}>
+            Cancel
+          </Button>
+          <Button type="submit" form={formId} busy={submitting} leading={<Save className="size-4" aria-hidden />}>
+            {submitting ? 'Saving...' : initialData ? 'Save Changes' : 'Publish Requirement'}
+          </Button>
+        </>
+      }
+    >
+      <form id={formId} ref={formRef} onSubmit={submit} className="space-y-6">
+        {/* AI-assisted description (create mode only) */}
+        {!initialData && (
+          <FormSection id={fieldId('s-assist')} step={steps.assist} title="Describe it">
+            <div className="col-span-12 space-y-4 rounded-sm border border-graphite/10 bg-sand-50 p-4 sm:p-5">
+              <div className="space-y-1.5">
+                <p className="t-eyebrow flex items-center gap-1.5">
+                  <Sparkles className="size-3.5 text-copper-600" aria-hidden />
+                  Assist · AI Smart Material Requirement Assistant
+                </p>
+                <p className="text-sm leading-relaxed text-slate-700">
+                  Describe the materials your business needs in plain language. Our AI extracts material specifications,
+                  acceptable dimensions, and required quantities into an editable form for your review.
+                </p>
+                <p className="text-xs text-slate-600">
+                  Extracted values are suggestions, not verified data. Nothing changes until you apply them, and every
+                  field must be checked before you publish.
+                </p>
               </div>
-              <p className="text-xs text-slate-600">
-                Describe the materials your business needs in plain language. Our AI extracts material specifications,
-                acceptable dimensions, and required quantities into an editable form for your review.
-              </p>
-              <textarea
-                value={aiPrompt}
-                onChange={(event) => setAiPrompt(event.target.value)}
-                rows={4}
-                placeholder="Describe family, grade, dimensions, quantity, condition, budget..."
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              />
-              <div className="flex flex-wrap gap-2">
-                <button type="button" onClick={loadSample} className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700">Stainless Steel Sample</button>
-                <button type="button" onClick={() => setAiPrompt('I need 50 pieces of PLYWOOD_COMMERCIAL marine plywood panels, 2440 by 1220 mm, thickness between 12 and 18 mm, in unused condition.')} className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700">Plywood Sample</button>
-                <button type="button" onClick={() => void handleAiExtract()} disabled={isExtracting} className="ml-auto inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white disabled:opacity-60">
-                  <Sparkles className="h-4 w-4" />
+
+              <div>
+                <label htmlFor={fieldId('ai-prompt')} className="field-label">
+                  Plain-language description
+                </label>
+                <textarea
+                  id={fieldId('ai-prompt')}
+                  data-autofocus
+                  value={aiPrompt}
+                  onChange={(event) => setAiPrompt(event.target.value)}
+                  rows={4}
+                  placeholder="Describe family, grade, dimensions, quantity, condition, budget..."
+                  className="field mt-1.5 resize-y leading-relaxed"
+                />
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2 border-t rule pt-4">
+                <span className="t-label mr-1">Try a sample</span>
+                <Button variant="secondary" size="xs" onClick={loadSample}>
+                  Stainless Steel Sample
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="xs"
+                  onClick={() =>
+                    setAiPrompt(
+                      'I need 50 pieces of PLYWOOD_COMMERCIAL marine plywood panels, 2440 by 1220 mm, thickness between 12 and 18 mm, in unused condition.'
+                    )
+                  }
+                >
+                  Plywood Sample
+                </Button>
+                <Button
+                  variant="ink"
+                  size="sm"
+                  className="ml-auto"
+                  busy={isExtracting}
+                  onClick={() => void handleAiExtract()}
+                  leading={<Sparkles className="size-4" aria-hidden />}
+                >
                   {isExtracting ? 'Extracting...' : 'Extract with AI'}
-                </button>
+                </Button>
               </div>
+
               {aiMessage && (
-                <div className={`flex items-start gap-2 rounded-lg border px-3 py-2 text-xs ${aiMessageType === 'error' ? 'border-red-200 bg-red-50 text-red-700' : 'border-emerald-200 bg-emerald-50 text-emerald-800'}`}>
-                  {aiMessageType === 'error' ? <AlertCircle className="h-4 w-4 shrink-0" /> : <CheckCircle2 className="h-4 w-4 shrink-0" />}
-                  <span>{aiMessage}</span>
+                <div role={aiMessageType === 'error' ? 'alert' : 'status'}>
+                  <Note tone={aiMessageType === 'error' ? 'danger' : 'neutral'}>
+                    <span className="flex items-start gap-2">
+                      {aiMessageType === 'error' ? (
+                        <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden />
+                      ) : (
+                        <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-copper-700" aria-hidden />
+                      )}
+                      <span>{aiMessage}</span>
+                    </span>
+                  </Note>
                 </div>
               )}
               {aiResult && (
-                <button type="button" onClick={applyAiResult} className="rounded-lg border border-emerald-300 bg-white px-3 py-2 text-xs font-bold text-emerald-700">
+                <Button variant="secondary" size="sm" onClick={applyAiResult}>
                   Apply Extracted Values to Form
-                </button>
+                </Button>
               )}
-            </section>
+            </div>
+          </FormSection>
+        )}
+
+        {/* Buyer & material */}
+        <FormSection id={fieldId('s-material')} step={steps.material} title="Buyer & material">
+          <Field id={fieldId('org')} label="Buyer organization" required error={errors.organization_id} className="col-span-12">
+            <select
+              {...controlProps(fieldId('org'), errors.organization_id)}
+              value={organizationId}
+              disabled={identity.locked}
+              onChange={(event) => setOrganizationId(event.target.value)}
+              className={cn('field', errors.organization_id && 'field-invalid')}
+            >
+              <option value="">Select buyer</option>
+              {buyers
+                .filter((o) => !identity.locked || o.id === identity.organizationId)
+                .map((organization) => (
+                  <option key={organization.id} value={organization.id}>
+                    {organization.name}
+                  </option>
+                ))}
+            </select>
+          </Field>
+
+          <Field id={fieldId('family')} label="Material family" required className="col-span-12 sm:col-span-6">
+            <select
+              {...controlProps(fieldId('family'))}
+              data-autofocus={isEditing || undefined}
+              value={family}
+              onChange={(event) => onFamilyChange(event.target.value as typeof family)}
+              className="field"
+            >
+              {MATERIAL_FAMILIES.map((materialFamily) => (
+                <option key={materialFamily} value={materialFamily}>
+                  {materialFamily === 'STAINLESS_STEEL_SHEET' ? 'Stainless Steel Sheet' : 'Plywood Panel'}
+                </option>
+              ))}
+            </select>
+          </Field>
+
+          <Field
+            id={fieldId('spec')}
+            label="Material specification"
+            required
+            error={errors.material_specification}
+            className="col-span-12 sm:col-span-6"
+          >
+            <select
+              {...controlProps(fieldId('spec'), errors.material_specification)}
+              value={specification}
+              onChange={(event) => setSpecification(event.target.value)}
+              className={cn('field', errors.material_specification && 'field-invalid')}
+            >
+              {MATERIAL_SPECIFICATIONS[family].map((materialSpecification) => (
+                <option key={materialSpecification} value={materialSpecification}>
+                  {materialSpecification}
+                </option>
+              ))}
+            </select>
+          </Field>
+
+          <Field id={fieldId('condition')} label="Condition requirement" className="col-span-12 sm:col-span-6">
+            <select
+              {...controlProps(fieldId('condition'))}
+              value={condition}
+              onChange={(event) => setCondition(event.target.value as typeof condition)}
+              className="field"
+            >
+              <option value="ANY">ANY</option>
+              <option value="UNUSED">UNUSED</option>
+              <option value="LEFTOVER">LEFTOVER</option>
+              <option value="OFFCUT">OFFCUT</option>
+            </select>
+          </Field>
+
+          {initialData && (
+            <Field id={fieldId('status')} label="Status" className="col-span-12 sm:col-span-6">
+              <select
+                {...controlProps(fieldId('status'))}
+                value={status}
+                onChange={(event) => setStatus(event.target.value as 'OPEN' | 'FULFILLED' | 'CANCELLED')}
+                className="field"
+              >
+                <option value="OPEN">OPEN</option>
+                <option value="FULFILLED">FULFILLED</option>
+                <option value="CANCELLED">CANCELLED</option>
+              </select>
+            </Field>
           )}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <label className="text-sm font-medium text-slate-700">
-              Buyer organization
-              <select value={organizationId} disabled={identity.locked} onChange={(event) => setOrganizationId(event.target.value)} className={`${fieldClass} mt-1`}>
-                <option value="">Select buyer</option>
-                {buyers.filter((o) => !identity.locked || o.id === identity.organizationId).map((organization) => (
-                  <option key={organization.id} value={organization.id}>{organization.name}</option>
-                ))}
-              </select>
-              {errors.organization_id && <span className="block mt-1 text-xs text-red-600">{errors.organization_id}</span>}
-            </label>
-            <label className="text-sm font-medium text-slate-700">
-              Material family
-              <select value={family} onChange={(event) => onFamilyChange(event.target.value as typeof family)} className={`${fieldClass} mt-1`}>
-                {MATERIAL_FAMILIES.map((materialFamily) => (
-                  <option key={materialFamily} value={materialFamily}>
-                    {materialFamily === 'STAINLESS_STEEL_SHEET' ? 'Stainless Steel Sheet' : 'Plywood Panel'}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="text-sm font-medium text-slate-700">
-              Material specification
-              <select value={specification} onChange={(event) => setSpecification(event.target.value)} className={`${fieldClass} mt-1`}>
-                {MATERIAL_SPECIFICATIONS[family].map((materialSpecification) => (
-                  <option key={materialSpecification} value={materialSpecification}>
-                    {materialSpecification}
-                  </option>
-                ))}
-              </select>
-              {errors.material_specification && <span className="block mt-1 text-xs text-red-600">{errors.material_specification}</span>}
-            </label>
-            {initialData && (
-              <label className="text-sm font-medium text-slate-700">
-                Status
-                <select
-                  value={status}
-                  onChange={(event) =>
-                    setStatus(event.target.value as 'OPEN' | 'FULFILLED' | 'CANCELLED')
-                  }
-                  className={`${fieldClass} mt-1`}
-                >
-                  <option value="OPEN">OPEN</option>
-                  <option value="FULFILLED">FULFILLED</option>
-                  <option value="CANCELLED">CANCELLED</option>
-                </select>
-              </label>
-            )}
-            {([
-              ['length', 'Length (mm)', lengthMin, lengthMax, setLengthMin, setLengthMax],
-              ['width', 'Width (mm)', widthMin, widthMax, setWidthMin, setWidthMax],
-              ['thickness', 'Thickness (mm)', thicknessMin, thicknessMax, setThicknessMin, setThicknessMax],
-            ] as const).map(([name, label, minValue, maxValue, setMin, setMax]) => (
-              <div key={name} className="text-sm font-medium text-slate-700">
-                {label}
-                <div className="mt-1 grid grid-cols-2 gap-2">
-                  <label className="text-xs text-slate-500">Minimum
-                    <input type="number" step="any" min="0" value={minValue} onChange={(event) => setMin(event.target.value)} className={`${fieldClass} mt-1`} />
-                  </label>
-                  <label className="text-xs text-slate-500">Maximum
-                    <input type="number" step="any" min="0" value={maxValue} onChange={(event) => setMax(event.target.value)} className={`${fieldClass} mt-1`} />
-                  </label>
+        </FormSection>
+
+        {/* Dimensions: acceptable ranges */}
+        <FormSection
+          id={fieldId('s-dimensions')}
+          step={steps.dimensions}
+          title="Dimensions"
+          description="Acceptable range per piece, in millimetres. Enter the same minimum and maximum for an exact size."
+        >
+          {(
+            [
+              ['length', 'Length', lengthMin, lengthMax, setLengthMin, setLengthMax],
+              ['width', 'Width', widthMin, widthMax, setWidthMin, setWidthMax],
+              ['thickness', 'Thickness', thicknessMin, thicknessMax, setThicknessMin, setThicknessMax],
+            ] as const
+          ).map(([name, label, minValue, maxValue, setMin, setMax]) => {
+            const error = errors[`${name}_mm`];
+            const errorId = `${fieldId(name)}-error`;
+            return (
+              <fieldset key={name} className="col-span-12 min-w-0 sm:col-span-4" aria-describedby={error ? errorId : undefined}>
+                <legend className="field-label">
+                  {label} <span className="sr-only">(mm)</span>
+                </legend>
+                <div className="mt-1.5 grid grid-cols-2 gap-2">
+                  {(
+                    [
+                      ['min', 'Min', minValue, setMin],
+                      ['max', 'Max', maxValue, setMax],
+                    ] as const
+                  ).map(([bound, boundLabel, value, setValue]) => {
+                    const id = fieldId(`${name}-${bound}`);
+                    return (
+                      <div key={bound} className="min-w-0">
+                        <label htmlFor={id} className="t-label">
+                          <span aria-hidden>{boundLabel}</span>
+                          <span className="sr-only">
+                            {bound === 'min' ? 'Minimum' : 'Maximum'} {label.toLowerCase()} (mm)
+                          </span>
+                        </label>
+                        <div className="relative mt-1">
+                          <input
+                            id={id}
+                            type="number"
+                            inputMode="decimal"
+                            step="any"
+                            min="0"
+                            value={value}
+                            onChange={(event) => setValue(event.target.value)}
+                            aria-invalid={error ? true : undefined}
+                            aria-describedby={error ? errorId : undefined}
+                            className={cn('field pr-10 tabular-nums', NO_SPIN, error && 'field-invalid')}
+                          />
+                          <span
+                            className="pointer-events-none absolute inset-y-0 right-2.5 flex items-center font-mono text-xs text-slate-600"
+                            aria-hidden
+                          >
+                            mm
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-                {errors[`${name}_mm`] && <span className="block mt-1 text-xs text-red-600">{errors[`${name}_mm`]}</span>}
-              </div>
-            ))}
-            <label className="text-sm font-medium text-slate-700">
-              Required quantity (pieces)
-              <input type="number" step="1" min="1" value={quantity} onChange={(event) => setQuantity(event.target.value)} className={`${fieldClass} mt-1`} />
-              {errors.required_quantity && <span className="block mt-1 text-xs text-red-600">{errors.required_quantity}</span>}
-            </label>
-            <label className="text-sm font-medium text-slate-700">
-              Maximum budget (BDT)
-              <input type="number" step="any" min="0" value={budget} onChange={(event) => setBudget(event.target.value)} className={`${fieldClass} mt-1`} />
-              {errors.maximum_budget_bdt && <span className="block mt-1 text-xs text-red-600">{errors.maximum_budget_bdt}</span>}
-            </label>
-            <label className="text-sm font-medium text-slate-700">
-              Condition requirement
-              <select value={condition} onChange={(event) => setCondition(event.target.value as typeof condition)} className={`${fieldClass} mt-1`}>
-                <option value="ANY">ANY</option>
-                <option value="UNUSED">UNUSED</option>
-                <option value="LEFTOVER">LEFTOVER</option>
-                <option value="OFFCUT">OFFCUT</option>
-              </select>
-            </label>
-          </div>
-          <label className="flex items-center gap-3 rounded-lg border border-slate-200 p-3 text-sm text-slate-700">
-            <input type="checkbox" checked={allowSplit} onChange={(event) => setAllowSplit(event.target.checked)} className="h-4 w-4 rounded border-slate-300 text-emerald-600" />
+                {error && (
+                  <p id={errorId} className="field-error">
+                    {error}
+                  </p>
+                )}
+              </fieldset>
+            );
+          })}
+        </FormSection>
+
+        {/* Quantity & budget */}
+        <FormSection id={fieldId('s-quantity')} step={steps.quantity} title="Quantity & budget">
+          <Field
+            id={fieldId('qty')}
+            label="Required quantity"
+            unit="pcs"
+            required
+            error={errors.required_quantity}
+            className="col-span-12 sm:col-span-6"
+          >
+            <input
+              {...controlProps(fieldId('qty'), errors.required_quantity)}
+              type="number"
+              inputMode="numeric"
+              step="1"
+              min="1"
+              value={quantity}
+              onChange={(event) => setQuantity(event.target.value)}
+              className={cn('field pr-12 tabular-nums', NO_SPIN, errors.required_quantity && 'field-invalid')}
+            />
+          </Field>
+
+          <Field
+            id={fieldId('budget')}
+            label="Maximum budget"
+            unit="BDT"
+            optional
+            error={errors.maximum_budget_bdt}
+            className="col-span-12 sm:col-span-6"
+          >
+            <input
+              {...controlProps(fieldId('budget'), errors.maximum_budget_bdt)}
+              type="number"
+              inputMode="decimal"
+              step="any"
+              min="0"
+              value={budget}
+              onChange={(event) => setBudget(event.target.value)}
+              className={cn('field pr-12 tabular-nums', NO_SPIN, errors.maximum_budget_bdt && 'field-invalid')}
+            />
+          </Field>
+
+          <label className="col-span-12 flex cursor-pointer items-start gap-3 border-y rule py-3 text-sm text-graphite">
+            <input
+              type="checkbox"
+              checked={allowSplit}
+              onChange={(event) => setAllowSplit(event.target.checked)}
+              className="mt-0.5 size-4 shrink-0 rounded-xs border-graphite/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-copper"
+            />
             Allow multiple suppliers to fulfill this requirement
           </label>
-          <div className="flex justify-end gap-3 pt-2">
-            <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-medium text-slate-600 rounded-lg border border-slate-300 hover:bg-slate-50">Cancel</button>
-            <button type="submit" disabled={submitting} className="inline-flex items-center gap-2 px-4 py-2 text-sm font-bold text-white rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60">
-              <Save className="w-4 h-4" />
-              {submitting ? 'Saving...' : initialData ? 'Save Changes' : 'Publish Requirement'}
-            </button>
-          </div>
-        </form>
+        </FormSection>
+
+        {/* Save failure: next to the actions so it is seen after submitting */}
+        {generalError && <ErrorState title="Requirement not saved" message={generalError} />}
+      </form>
+    </Dialog>
+  );
+}
+
+/* ------------------------------------------------------------------ layout helpers */
+
+/** Hides the native number spinners so unit suffixes sit cleanly (arrow keys still step). */
+const NO_SPIN =
+  '[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none';
+
+/** Accessible wiring for a control rendered inside <Field>. */
+function controlProps(id: string, error?: string, hasHint = false) {
+  const describedBy = [hasHint && `${id}-hint`, error && `${id}-error`].filter(Boolean).join(' ');
+  return {
+    id,
+    'aria-invalid': error ? true : undefined,
+    'aria-describedby': describedBy || undefined,
+  };
+}
+
+function FormSection({
+  id,
+  step,
+  title,
+  description,
+  children,
+}: {
+  id: string;
+  step: string;
+  title: string;
+  description?: string;
+  children: ReactNode;
+}) {
+  return (
+    <section aria-labelledby={id} className="space-y-4 border-t rule pt-6 first:border-t-0 first:pt-0">
+      <div className="flex items-baseline gap-3">
+        <span className="font-mono text-xs tabular-nums text-copper-700" aria-hidden>
+          {step}
+        </span>
+        <div className="min-w-0">
+          <h3 id={id} className="text-[15px] font-medium tracking-[-0.01em] text-graphite">
+            {title}
+          </h3>
+          {description && <p className="mt-0.5 text-xs text-slate-600">{description}</p>}
+        </div>
       </div>
+      <div className="grid grid-cols-12 gap-x-4 gap-y-5">{children}</div>
+    </section>
+  );
+}
+
+function Field({
+  id,
+  label,
+  required,
+  optional,
+  unit,
+  hint,
+  error,
+  className,
+  children,
+}: {
+  id: string;
+  label: string;
+  required?: boolean;
+  optional?: boolean;
+  unit?: string;
+  hint?: string;
+  error?: string;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className={cn('min-w-0', className)}>
+      <label htmlFor={id} className="field-label">
+        {label}
+        {unit && <span className="sr-only"> ({unit})</span>}
+        {required && (
+          <>
+            <span className="ml-0.5 text-copper-700" aria-hidden>
+              *
+            </span>
+            <span className="sr-only"> (required)</span>
+          </>
+        )}
+        {optional && <span className="ml-1.5 font-normal text-slate-600">Optional</span>}
+      </label>
+      <div className="relative mt-1.5">
+        {children}
+        {unit && (
+          <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center font-mono text-xs text-slate-600" aria-hidden>
+            {unit}
+          </span>
+        )}
+      </div>
+      {hint && (
+        <p id={`${id}-hint`} className="field-hint">
+          {hint}
+        </p>
+      )}
+      {error && (
+        <p id={`${id}-error`} className="field-error">
+          {error}
+        </p>
+      )}
     </div>
   );
 }

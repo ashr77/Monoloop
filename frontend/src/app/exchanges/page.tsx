@@ -1,5 +1,6 @@
 import { Suspense } from 'react';
 import { ExchangesDashboard } from '@/features/exchanges/components/ExchangesDashboard';
+import { TableSkeleton } from '@/components/ui';
 
 export const metadata = {
   title: 'Exchanges | MONOLOOP',
@@ -9,7 +10,14 @@ export const metadata = {
 export default function ExchangesPage() {
   // useSearchParams() in the dashboard requires a Suspense boundary.
   return (
-    <Suspense fallback={<div className="max-w-7xl mx-auto px-4 py-12 text-sm text-slate-500">Loading exchanges…</div>}>
+    <Suspense
+      fallback={
+        <div className="page-shell space-y-8 pb-20 pt-12">
+          <p className="t-eyebrow">Exchange coordination</p>
+          <TableSkeleton rows={4} columns={5} label="Loading exchanges" />
+        </div>
+      }
+    >
       <ExchangesDashboard />
     </Suspense>
   );

@@ -6,21 +6,18 @@
 // confirms the transfer. "Acting as" is the demo identity sent to the API.
 // ============================================================================
 
-import Link from 'next/link';
 import { requirementSize } from '@/lib/dimensions';
 import { useIdentity } from '@/lib/auth/AuthProvider';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  AlertTriangle,
   ArrowLeftRight,
+  ArrowRight,
+  ArrowUpDown,
   Building2,
   Check,
-  CheckCircle2,
   ChevronDown,
   CreditCard,
-  Info,
-  Loader2,
   PackageCheck,
   RefreshCw,
   Undo2,
@@ -29,7 +26,28 @@ import {
 import type { Organization } from '@/lib/types';
 import type { ExchangeAction, ExchangeStage, ExchangeView } from '../types';
 import { useExchangeAction, useExchanges, useOrganizations, useStartPayment } from '@/hooks';
+import { usePersistentState, useIncremental, sortBy } from '@/hooks/useViewPrefs';
 import { errorMessage } from '@/lib/api/client';
+import { cn } from '@/lib/utils';
+import {
+  Button,
+  ConfirmDialog,
+  EmptyState,
+  ErrorState,
+  LinkButton,
+  LoadMore,
+  MetricStrip,
+  Note,
+  PageHeader,
+  Segmented,
+  StatusBadge,
+  TableSkeleton,
+  Tag,
+  Toast,
+  ToolbarSelect,
+  type ToastMessage,
+} from '@/components/ui';
+import { AnimatePresence, motion, rowMotion, useReducedMotion } from '@/components/motion';
 import {
   ACTIVITY_LABEL,
   ITEM_STATUS_META,
@@ -42,6 +60,7 @@ import {
 } from './format';
 
 type Filter = 'ACTIVE' | 'COMPLETED' | 'CANCELLED' | 'ALL';
+type Sort = 'newest' | 'oldest' | 'value';
 
 const FILTERS: { id: Filter; label: string; stages: ExchangeStage[] }[] = [
   { id: 'ACTIVE', label: 'Active', stages: ['AWAITING_SUPPLIERS', 'SUPPLIER_DECLINED', 'RESERVED'] },
@@ -50,22 +69,35 @@ const FILTERS: { id: Filter; label: string; stages: ExchangeStage[] }[] = [
   { id: 'ALL', label: 'All', stages: ['AWAITING_SUPPLIERS', 'SUPPLIER_DECLINED', 'RESERVED', 'COMPLETED', 'CANCELLED'] },
 ];
 
-interface Toast {
-  kind: 'success' | 'error';
-  message: string;
+const SORTS: { id: Sort; label: string }[] = [
+  { id: 'newest', label: 'Newest first' },
+  { id: 'oldest', label: 'Oldest first' },
+  { id: 'value', label: 'Highest value' },
+];
+
+const PAGE_SIZE = 8;
+
+/** An action that needs an explicit confirmation before it is sent. */
+interface PendingConfirm {
+  ex: ExchangeView;
+  action: Extract<ExchangeAction, 'complete' | 'cancel' | 'reject'>;
+  itemId?: string;
 }
 
 export function ExchangesDashboard() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const identity = useIdentity();
+  const reduceMotion = useReducedMotion();
   // Signed in: always the company itself (admins: everything, read-only). Demo: the ?as= switcher.
   const actingAs = identity.locked ? identity.organizationId ?? 'ALL' : searchParams.get('as') ?? 'ALL';
   const highlight = searchParams.get('highlight');
 
-  const [filter, setFilter] = useState<Filter>('ACTIVE');
+  const [filter, setFilter] = usePersistentState<Filter>('exchanges.filter', 'ACTIVE');
+  const [sort, setSort] = usePersistentState<Sort>('exchanges.sort', 'newest');
   const [busy, setBusy] = useState<string | null>(null);
-  const [toast, setToast] = useState<Toast | null>(null);
+  const [toast, setToast] = useState<ToastMessage | null>(null);
+  const [confirm, setConfirm] = useState<PendingConfirm | null>(null);
 
   // Data comes from the FastAPI backend through cached hooks (src/hooks).
   const exchangesQuery = useExchanges(actingAs !== 'ALL' ? { organization_id: actingAs } : {});
@@ -82,7 +114,7 @@ export function ExchangesDashboard() {
   const paymentReturn = searchParams.get('payment');
   useEffect(() => {
     if (!paymentReturn) return;
-    const messages: Record<string, Toast> = {
+    const messages: Record<string, ToastMessage> = {
       success: { kind: 'success', message: 'Payment received and verified. You can now confirm the transfer.' },
       failed: { kind: 'error', message: 'Payment failed or could not be verified. No money was recorded; you can try again.' },
       cancelled: { kind: 'error', message: 'Payment cancelled. You can pay again whenever you are ready.' },
@@ -94,16 +126,10 @@ export function ExchangesDashboard() {
     router.replace(`/exchanges${params.size ? `?${params}` : ''}`, { scroll: false });
   }, [paymentReturn, searchParams, router]);
 
-  useEffect(() => {
-    if (!toast) return;
-    const t = setTimeout(() => setToast(null), 5000);
-    return () => clearTimeout(t);
-  }, [toast]);
-
   // When arriving from "Request exchange", show the new request even if the filter would hide it.
   useEffect(() => {
     if (highlight) setFilter('ACTIVE');
-  }, [highlight]);
+  }, [highlight, setFilter]);
 
   // Organizations known to the API plus any that appear in exchanges.
   const orgOptions = useMemo(() => {
@@ -155,6 +181,12 @@ export function ExchangesDashboard() {
     }
   }
 
+  async function runConfirmed() {
+    if (!confirm) return;
+    await act(confirm.ex, confirm.action, confirm.itemId);
+    setConfirm(null);
+  }
+
   const stats = useMemo(() => {
     const by = (s: ExchangeStage) => exchanges.filter((e) => e.stage === s).length;
     const reservedUnits = exchanges
@@ -171,178 +203,266 @@ export function ExchangesDashboard() {
     };
   }, [exchanges]);
 
-  const visible = exchanges.filter((e) => FILTERS.find((f) => f.id === filter)!.stages.includes(e.stage));
+  // Filter → sort → (pin the highlighted request on top so it is never hidden behind "Load more").
+  const ordered = useMemo(() => {
+    const stages = FILTERS.find((f) => f.id === filter)!.stages;
+    const filtered = exchanges.filter((e) => stages.includes(e.stage));
+    const sorted =
+      sort === 'value'
+        ? sortBy(filtered, (e) => e.total_value_bdt, 'desc')
+        : sortBy(filtered, (e) => new Date(e.created_at).getTime(), sort === 'oldest' ? 'asc' : 'desc');
+    if (!highlight) return sorted;
+    const hit = sorted.find((e) => e.id === highlight);
+    return hit ? [hit, ...sorted.filter((e) => e.id !== highlight)] : sorted;
+  }, [exchanges, filter, sort, highlight]);
+
+  const page = useIncremental(ordered, PAGE_SIZE, `${filter}:${sort}:${actingAs}`);
+
+  // Bring the highlighted request into view once, after it has rendered.
+  const scrolledFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (!highlight || loading || scrolledFor.current === highlight) return;
+    const el = document.getElementById(`exchange-${highlight}`);
+    if (!el) return;
+    scrolledFor.current = highlight;
+    const raf = requestAnimationFrame(() =>
+      el.scrollIntoView({ block: 'center', behavior: reduceMotion ? 'auto' : 'smooth' })
+    );
+    return () => cancelAnimationFrame(raf);
+  }, [highlight, loading, page.visible, reduceMotion]);
+
+  // Keep the last request's copy while the dialog animates out.
+  const lastConfirm = useRef<PendingConfirm | null>(null);
+  if (confirm) lastConfirm.current = confirm;
+  const confirmCopy = lastConfirm.current ? confirmText(lastConfirm.current, orgName) : null;
+  const confirmBusy = confirm
+    ? busy === `${confirm.ex.id}:${confirm.action}:${confirm.itemId ?? ''}`
+    : false;
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-      {toast && (
-        <div
-          role="status"
-          className={`fixed bottom-6 right-6 z-50 max-w-sm px-4 py-3 rounded-xl shadow-lg flex items-start gap-2 text-sm text-white ${
-            toast.kind === 'success' ? 'bg-emerald-700' : 'bg-red-700'
-          }`}
-        >
-          {toast.kind === 'success' ? (
-            <CheckCircle2 className="w-5 h-5 flex-shrink-0" />
-          ) : (
-            <AlertTriangle className="w-5 h-5 flex-shrink-0" />
-          )}
-          <span>{toast.message}</span>
-        </div>
-      )}
+    <div className="page-shell pb-20">
+      <Toast toast={toast} onDismiss={() => setToast(null)} duration={5000} />
 
-      {/* Header & identity switcher */}
-      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">
-              Exchange Coordination
-            </span>
-            <span className="text-xs text-slate-400 font-mono">TSUNAGU Hackathon 2026</span>
-          </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight mt-1">
-            Exchange Requests &amp; Reservations
-          </h1>
-          <p className="text-sm text-slate-500 mt-1">
-            Suppliers accept their share, stock is reserved atomically, and the buyer confirms the transfer.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          {identity.locked ? (
-            <span className="flex items-center gap-2 bg-slate-100 px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-800">
-              <Building2 className="w-4 h-4 text-slate-500" />
-              {identity.organization?.name ?? 'Admin · all exchanges (read-only)'}
-            </span>
-          ) : (
-          <label className="flex items-center gap-2 bg-slate-100 p-1.5 rounded-xl border border-slate-200">
-            <Building2 className="w-4 h-4 text-slate-500 ml-1.5" />
-            <span className="sr-only">Acting as</span>
-            <select
-              value={actingAs}
-              onChange={(e) => setActingAs(e.target.value)}
-              className="bg-transparent text-xs font-bold text-slate-800 focus:outline-none cursor-pointer pr-2 max-w-[18rem]"
+      <PageHeader
+        eyebrow="Exchange coordination"
+        title="Exchange requests & reservations"
+        description="Suppliers accept their share, stock is reserved atomically, and the buyer confirms the transfer."
+        actions={
+          <>
+            {identity.locked ? (
+              <span className="inline-flex h-8 min-w-0 items-center gap-1.5 text-[13px] text-slate-600">
+                <Building2 className="size-4 text-slate-500" aria-hidden />
+                <span className="sr-only">Signed in as</span>
+                <span className="truncate font-medium text-graphite">
+                  {identity.organization?.name ?? 'Admin · all exchanges (read-only)'}
+                </span>
+              </span>
+            ) : (
+              <ToolbarSelect
+                label="Acting as"
+                icon={<Building2 className="size-4" />}
+                value={actingAs}
+                onChange={(e) => setActingAs(e.target.value)}
+                className="max-w-[20rem]"
+              >
+                <option value="ALL">All organizations (view only)</option>
+                {orgOptions.map((o) => (
+                  <option key={o.id} value={o.id}>
+                    Acting as: {o.name}
+                  </option>
+                ))}
+              </ToolbarSelect>
+            )}
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={load}
+              disabled={loading}
+              leading={
+                <RefreshCw
+                  className={cn('size-3.5', exchangesQuery.isFetching && 'animate-spin')}
+                  aria-hidden
+                />
+              }
             >
-              <option value="ALL">All organizations (view only)</option>
-              {orgOptions.map((o) => (
-                <option key={o.id} value={o.id}>
-                  Acting as: {o.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          )}
-          <button
-            onClick={load}
-            disabled={loading}
-            className="p-2 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-600 text-xs flex items-center gap-1 transition"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-            <span className="hidden sm:inline">Refresh</span>
-          </button>
-        </div>
-      </div>
+              Refresh
+            </Button>
+          </>
+        }
+      >
+        <MetricStrip
+          metrics={[
+            { label: 'Awaiting suppliers', value: num(stats.awaiting), note: 'Requested, not yet reserved', tone: stats.awaiting ? 'warning' : 'default' },
+            { label: 'Reserved', value: num(stats.reserved), note: 'Ready for transfer', tone: 'copper', emphasis: true },
+            { label: 'Reserved pieces', value: num(stats.reservedUnits), note: 'Held by accepted items' },
+            { label: 'Completed', value: num(stats.completed), note: 'Counted as reuse' },
+            { label: 'Cancelled', value: num(stats.cancelled), note: 'Reservations released' },
+          ]}
+        />
+      </PageHeader>
 
-      {/* Workflow note */}
-      <div className="p-4 bg-emerald-50/70 border border-emerald-200 rounded-xl text-xs text-emerald-900 flex items-start gap-3">
-        <Info className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
-        <div className="space-y-1">
+      <div className="space-y-8 pt-8">
+        <Note>
           <p>
-            <strong>Requested → Accepted → Reserved → Completed.</strong> A match is only a proposal. Stock is re-checked and
-            reserved in a single database transaction when each supplier accepts, so the same pieces can never be promised
-            twice. Cancelling releases reservations; completing deducts inventory exactly once.
+            <strong className="font-medium text-graphite">Requested → Accepted → Reserved → Completed.</strong> A match is
+            only a proposal. Stock is re-checked and reserved in a single database transaction when each supplier accepts,
+            so the same pieces can never be promised twice. Cancelling releases reservations; completing deducts inventory
+            exactly once.
           </p>
           {actingAs === 'ALL' && !identity.locked && (
-            <p className="font-semibold">Choose an organization in &ldquo;Acting as&rdquo; to accept, decline, complete or cancel.</p>
+            <p className="mt-1 font-medium text-graphite">
+              Choose an organization in &ldquo;Acting as&rdquo; to accept, decline, complete or cancel.
+            </p>
           )}
-        </div>
-      </div>
+        </Note>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-        <Stat label="Awaiting suppliers" value={stats.awaiting} note="Requested, not yet reserved" />
-        <Stat label="Reserved" value={stats.reserved} note="Ready for transfer" />
-        <Stat label="Reserved pieces" value={stats.reservedUnits} note="Held by accepted items" />
-        <Stat label="Completed" value={stats.completed} note="Counted as reuse" />
-        <Stat label="Cancelled" value={stats.cancelled} note="Reservations released" />
-      </div>
-
-      {/* Filter tabs */}
-      <div className="flex flex-wrap items-center gap-2" role="tablist" aria-label="Filter exchanges">
-        {FILTERS.map((f) => {
-          const count = exchanges.filter((e) => f.stages.includes(e.stage)).length;
-          return (
-            <button
-              key={f.id}
-              role="tab"
-              aria-selected={filter === f.id}
-              onClick={() => setFilter(f.id)}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition ${
-                filter === f.id
-                  ? 'bg-slate-900 text-white border-slate-900'
-                  : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-              }`}
-            >
-              {f.label} <span className="opacity-70">({count})</span>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* List */}
-      {loading && exchanges.length === 0 ? (
-        <div className="p-12 text-center bg-white rounded-2xl border border-slate-200">
-          <Loader2 className="w-8 h-8 text-emerald-600 animate-spin mx-auto mb-2" />
-          <p className="text-sm font-medium text-slate-600">Loading exchanges…</p>
-        </div>
-      ) : loadError ? (
-        <div className="p-8 text-center bg-white rounded-2xl border border-red-200 text-red-700 space-y-3">
-          <AlertTriangle className="w-8 h-8 mx-auto" />
-          <p className="text-sm">{loadError}</p>
-          <button onClick={load} className="text-sm font-semibold underline">
-            Try again
-          </button>
-        </div>
-      ) : visible.length === 0 ? (
-        <div className="p-12 text-center bg-white rounded-2xl border border-dashed border-slate-300 space-y-3">
-          <ArrowLeftRight className="w-8 h-8 text-slate-400 mx-auto" />
-          <p className="text-sm font-semibold text-slate-700">No {filter === 'ALL' ? '' : filter.toLowerCase() + ' '}exchanges yet.</p>
-          <p className="text-sm text-slate-500">
-            Open a requirement&rsquo;s matches and choose <strong>Request exchange</strong> to start one.
-          </p>
-          <Link href="/demand" className="inline-flex text-sm font-semibold text-emerald-700 hover:underline">
-            Go to buyer requirements →
-          </Link>
-        </div>
-      ) : (
-        <div className="space-y-5">
-          {visible.map((ex) => (
-            <ExchangeCard
-              key={ex.id}
-              ex={ex}
-              actingAs={actingAs}
-              highlighted={ex.id === highlight}
-              busy={busy}
-              onAct={act}
-              onPay={pay}
-              onSwitch={identity.locked ? undefined : setActingAs}
-              orgName={orgName}
+        {/* Toolbar: filter tabs + sort */}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div className="-mx-4 overflow-x-auto px-4 scrollbar-none sm:mx-0 sm:px-0">
+            <Segmented<Filter>
+              variant="tabs"
+              label="Filter exchanges"
+              value={filter}
+              onChange={setFilter}
+              options={FILTERS.map((f) => ({
+                value: f.id,
+                label: f.label,
+                count: exchanges.filter((e) => f.stages.includes(e.stage)).length,
+              }))}
             />
-          ))}
+          </div>
+          <ToolbarSelect
+            label="Sort exchanges"
+            icon={<ArrowUpDown className="size-3.5" />}
+            value={sort}
+            onChange={(e) => setSort(e.target.value as Sort)}
+            className="self-start sm:self-auto"
+          >
+            {SORTS.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.label}
+              </option>
+            ))}
+          </ToolbarSelect>
         </div>
-      )}
+
+        {/* List */}
+        {loading && exchanges.length === 0 ? (
+          <TableSkeleton rows={4} columns={5} label="Loading exchanges" />
+        ) : loadError ? (
+          <ErrorState title="Exchanges could not be loaded" message={loadError} onRetry={load} />
+        ) : ordered.length === 0 ? (
+          <EmptyState
+            icon={<ArrowLeftRight className="size-6" aria-hidden />}
+            title={`No ${filter === 'ALL' ? '' : filter.toLowerCase() + ' '}exchanges yet.`}
+            description={
+              <>
+                Open a requirement&rsquo;s matches and choose <strong className="font-medium text-graphite">Request exchange</strong>{' '}
+                to start one.
+              </>
+            }
+            action={
+              <LinkButton href="/demand" variant="secondary" size="sm" trailing={<ArrowRight className="size-3.5" aria-hidden />}>
+                Go to buyer requirements
+              </LinkButton>
+            }
+          />
+        ) : (
+          <div>
+            <div className="space-y-5">
+              <AnimatePresence initial={false}>
+                {page.visible.map((ex) => (
+                  <ExchangeRecord
+                    key={ex.id}
+                    ex={ex}
+                    actingAs={actingAs}
+                    highlighted={ex.id === highlight}
+                    busy={busy}
+                    onAct={act}
+                    onConfirm={setConfirm}
+                    onPay={pay}
+                    onSwitch={identity.locked ? undefined : setActingAs}
+                    orgName={orgName}
+                  />
+                ))}
+              </AnimatePresence>
+            </div>
+            <LoadMore shown={page.shown} total={page.total} onMore={page.more} noun="exchanges" />
+          </div>
+        )}
+      </div>
+
+      <ConfirmDialog
+        open={confirm !== null}
+        onClose={() => {
+          if (!confirmBusy) setConfirm(null);
+        }}
+        onConfirm={() => void runConfirmed()}
+        title={confirmCopy?.title ?? ''}
+        description={confirmCopy?.description}
+        confirmLabel={confirmCopy?.confirmLabel}
+        tone={confirmCopy?.tone}
+        busy={confirmBusy}
+      >
+        {confirmCopy?.body}
+      </ConfirmDialog>
     </div>
   );
 }
 
-function Stat({ label, value, note }: { label: string; value: number; note: string }) {
-  return (
-    <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-1">
-      <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">{label}</div>
-      <div className="text-2xl font-extrabold text-slate-900 tabular-nums">{num(value)}</div>
-      <div className="text-xs text-slate-500">{note}</div>
-    </div>
-  );
+/** Grade for the title: the requirement's, or (direct listing orders) the ordered listing's. */
+function materialName(ex: ExchangeView): string {
+  const spec = ex.requirement?.material_specification ?? ex.items[0]?.listing?.material_specification;
+  return spec ? SPEC_LABEL[spec] ?? spec : 'material';
 }
+
+/* ----------------------------------------------------------- confirmations */
+
+function confirmText(c: PendingConfirm, orgName: (id: string) => string) {
+  const { ex } = c;
+  const material = materialName(ex);
+  const summary = (
+    <p className="font-mono text-xs text-slate-600">
+      #{ex.id.slice(0, 8)} · {num(ex.total_quantity)} × {material} · {bdt(ex.total_value_bdt)}
+    </p>
+  );
+  if (c.action === 'complete') {
+    return {
+      title: 'Confirm the transfer?',
+      description:
+        'Only confirm once the materials have been handed over. Completing deducts the reserved pieces from each supplier’s inventory exactly once and counts the exchange as reuse. This cannot be undone.',
+      confirmLabel: 'Confirm transfer',
+      tone: 'primary' as const,
+      body: summary,
+    };
+  }
+  if (c.action === 'cancel') {
+    return {
+      title: 'Cancel this exchange?',
+      description:
+        'Cancelling releases every piece reserved for this exchange back to the suppliers’ available stock. Nothing is transferred, and you would need to request again from the matches page.',
+      confirmLabel: 'Cancel exchange',
+      tone: 'danger' as const,
+      body: summary,
+    };
+  }
+  const item = ex.items.find((i) => i.id === c.itemId);
+  return {
+    title: 'Decline this item?',
+    description: `${ex.buyer?.name ?? orgName(ex.buyer_organization_id)} will see that you declined. The exchange can then no longer be completed and the buyer will have to cancel it and request again.`,
+    confirmLabel: 'Decline item',
+    tone: 'danger' as const,
+    body: item ? (
+      <p className="font-mono text-xs text-slate-600">
+        {num(item.quantity)} pcs · {dims(item.listing)} · {bdt(item.subtotal_bdt)}
+      </p>
+    ) : (
+      summary
+    ),
+  };
+}
+
+/* ---------------------------------------------------------------- progress */
 
 const STEPS = ['Requested', 'Suppliers accepted', 'Reserved', 'Completed'];
 
@@ -353,43 +473,138 @@ function stepIndex(ex: ExchangeView): number {
   return 1;
 }
 
+/** Connected timeline: copper nodes and line for reached steps; slate when the exchange halted. */
 function Stepper({ ex }: { ex: ExchangeView }) {
   const done = stepIndex(ex);
   const halted = ex.stage === 'CANCELLED' || ex.stage === 'SUPPLIER_DECLINED';
+  const reachedAt = (i: number) => i < done && ex.stage !== 'CANCELLED';
+  const current = !halted && ex.stage !== 'COMPLETED' ? done : -1;
+
   return (
-    <ol className="grid grid-cols-4 gap-2" aria-label="Exchange progress">
-      {STEPS.map((label, i) => {
-        const reached = i < done && ex.stage !== 'CANCELLED';
-        return (
-          <li key={label} className="space-y-1.5">
-            <div
-              className={`h-1.5 rounded-full ${
-                reached ? (halted ? 'bg-slate-400' : 'bg-emerald-600') : 'bg-slate-200'
-              }`}
-            />
-            <div className={`text-[11px] font-medium ${reached ? 'text-slate-800' : 'text-slate-400'}`}>
-              {i === 1 && ex.items.length > 0 ? `${label} (${ex.counts.accepted + ex.counts.completed}/${ex.items.length})` : label}
-            </div>
-          </li>
-        );
-      })}
-    </ol>
+    <div className="space-y-2">
+      <ol className="grid grid-cols-4" aria-label="Exchange progress">
+        {STEPS.map((label, i) => {
+          const reached = reachedAt(i);
+          const isCurrent = i === current;
+          const lineReached = i < STEPS.length - 1 && reachedAt(i + 1);
+          const text =
+            i === 1 && ex.items.length > 0 ? `${label} (${ex.counts.accepted + ex.counts.completed}/${ex.items.length})` : label;
+          return (
+            <li key={label} className="relative min-w-0 pr-2" aria-current={isCurrent ? 'step' : undefined}>
+              <div className="flex items-center">
+                <span
+                  className={cn(
+                    'relative z-10 flex size-4 shrink-0 items-center justify-center rounded-full border',
+                    reached
+                      ? halted
+                        ? 'border-slate-400 bg-slate-400 text-cream'
+                        : 'border-copper-600 bg-copper-600 text-white'
+                      : isCurrent
+                        ? 'border-copper bg-cream-paper ring-2 ring-copper/20'
+                        : 'border-graphite/25 bg-cream-paper'
+                  )}
+                  aria-hidden
+                >
+                  {reached && <Check className="size-2.5" strokeWidth={3} />}
+                </span>
+                {i < STEPS.length - 1 && (
+                  <span
+                    className={cn(
+                      'h-px flex-1',
+                      lineReached ? (halted ? 'bg-slate-400' : 'h-0.5 bg-copper') : 'bg-graphite/15'
+                    )}
+                    aria-hidden
+                  />
+                )}
+              </div>
+              <p
+                className={cn(
+                  'mt-2 text-[11px] font-medium leading-snug',
+                  reached ? 'text-graphite' : isCurrent ? 'text-copper-700' : 'text-slate-600'
+                )}
+              >
+                {text}
+                <span className="sr-only">{reached ? ' (done)' : isCurrent ? ' (in progress)' : ' (not reached)'}</span>
+              </p>
+            </li>
+          );
+        })}
+      </ol>
+      {halted && (
+        <p
+          className={cn(
+            'flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.06em]',
+            ex.stage === 'CANCELLED' ? 'text-slate-600' : 'text-brick-700'
+          )}
+        >
+          <X className="size-3" aria-hidden />
+          {ex.stage === 'CANCELLED' ? 'Halted · exchange cancelled' : 'Halted · a supplier declined'}
+        </p>
+      )}
+    </div>
   );
 }
 
-interface CardProps {
+/* ------------------------------------------------------------- next action */
+
+interface NextStep {
+  /** `you` = the current identity must act; `other` = waiting on someone else; `done` = nothing left. */
+  who: 'you' | 'other' | 'done';
+  text: string;
+}
+
+function nextStep(ex: ExchangeView, actingAs: string, isBuyer: boolean, needsPayment: boolean): NextStep {
+  const plural = (n: number, w: string) => `${num(n)} ${w}${n === 1 ? '' : 's'}`;
+  switch (ex.stage) {
+    case 'COMPLETED':
+      return { who: 'done', text: 'Transfer confirmed. Inventory has been updated and the exchange counts as reuse.' };
+    case 'CANCELLED':
+      return { who: 'done', text: 'Cancelled. Any reserved stock was released back to the suppliers.' };
+    case 'SUPPLIER_DECLINED':
+      return isBuyer
+        ? { who: 'you', text: 'Your turn: cancel this exchange to release the stock other suppliers reserved.' }
+        : { who: 'other', text: 'A supplier declined. Waiting on the buyer to cancel and release reserved stock.' };
+    case 'RESERVED':
+      if (isBuyer) {
+        return needsPayment
+          ? { who: 'you', text: `Your turn: pay ${bdt(ex.total_value_bdt)}, then confirm the transfer.` }
+          : { who: 'you', text: 'Your turn: confirm the transfer once the materials have been handed over.' };
+      }
+      return needsPayment
+        ? { who: 'other', text: `Stock reserved. Waiting on the buyer to pay ${bdt(ex.total_value_bdt)} and confirm the transfer.` }
+        : { who: 'other', text: 'Stock reserved. Waiting on the buyer to confirm the transfer.' };
+    case 'AWAITING_SUPPLIERS':
+    default: {
+      const mine = ex.items.filter(
+        (i) => i.supplier_organization_id === actingAs && i.status === 'PENDING' && ex.status === 'PROPOSED'
+      ).length;
+      if (mine > 0) {
+        return {
+          who: 'you',
+          text: mine === 1 ? 'Your turn: accept or decline your item.' : `Your turn: accept or decline your ${num(mine)} items.`,
+        };
+      }
+      return { who: 'other', text: `Waiting on ${plural(ex.counts.pending, 'supplier')} to accept.` };
+    }
+  }
+}
+
+/* ------------------------------------------------------------------ record */
+
+interface RecordProps {
   ex: ExchangeView;
   actingAs: string;
   highlighted: boolean;
   busy: string | null;
   onAct: (ex: ExchangeView, action: ExchangeAction, itemId?: string) => void;
+  onConfirm: (c: PendingConfirm) => void;
   onPay: (ex: ExchangeView) => void;
   /** Demo only: jump to another organization's view. Absent when signed in. */
   onSwitch?: (orgId: string) => void;
   orgName: (id: string) => string;
 }
 
-function ExchangeCard({ ex, actingAs, highlighted, busy, onAct, onPay, onSwitch, orgName }: CardProps) {
+function ExchangeRecord({ ex, actingAs, highlighted, busy, onAct, onConfirm, onPay, onSwitch, orgName }: RecordProps) {
   const req = ex.requirement;
   const stage = STAGE_META[ex.stage];
   const isBuyer = actingAs === ex.buyer_organization_id;
@@ -400,220 +615,265 @@ function ExchangeCard({ ex, actingAs, highlighted, busy, onAct, onPay, onSwitch,
   const anyBusy = busy?.startsWith(ex.id) ?? false;
   const paid = ex.payment?.status === 'PAID';
   const needsPayment = Boolean(ex.payment_required) && !paid;
+  const next = nextStep(ex, actingAs, isBuyer, needsPayment);
+  const buyerName = ex.buyer?.name ?? orgName(ex.buyer_organization_id);
 
   return (
-    <article
-      className={`bg-white rounded-2xl border shadow-sm overflow-hidden ${
-        highlighted ? 'border-emerald-500 ring-2 ring-emerald-200' : 'border-slate-200'
-      }`}
+    <motion.article
+      {...rowMotion}
+      id={`exchange-${ex.id}`}
+      className={cn(
+        'scroll-mt-24 overflow-hidden rounded-sm border bg-cream-paper',
+        highlighted ? 'border-graphite/10 border-l-[3px] border-l-copper bg-sand-50' : 'border-graphite/10'
+      )}
       aria-labelledby={`ex-${ex.id}`}
     >
       {/* Header */}
-      <div className="p-5 border-b border-slate-100 flex flex-col lg:flex-row lg:items-start justify-between gap-4">
-        <div className="space-y-1 min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold border ${stage.className}`}>{stage.label}</span>
-            {role && (
-              <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-900 text-white">You: {role}</span>
-            )}
+      <div className="flex flex-col justify-between gap-4 px-5 pb-4 pt-5 lg:flex-row lg:items-start sm:px-6">
+        <div className="min-w-0 space-y-2">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+            <StatusBadge tone={stage.tone}>{stage.label}</StatusBadge>
+            {role && <Tag className="border-graphite/30 text-graphite">You: {role}</Tag>}
             {paid && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border bg-emerald-50 text-emerald-800 border-emerald-200">
-                <CreditCard className="w-3 h-3" /> Paid{ex.payment?.card_type ? ` · ${ex.payment.card_type}` : ''}
-              </span>
+              <StatusBadge tone="success" solid>
+                <CreditCard className="size-3" aria-hidden /> Paid{ex.payment?.card_type ? ` · ${ex.payment.card_type}` : ''}
+              </StatusBadge>
             )}
-            <span className="text-xs text-slate-400 font-mono">#{ex.id.slice(0, 8)}</span>
+            {highlighted && <Tag className="border-copper/40 text-copper-700">New request</Tag>}
+            <span className="font-mono text-xs text-slate-600">#{ex.id.slice(0, 8)}</span>
           </div>
-          <h2 id={`ex-${ex.id}`} className="text-lg font-bold text-slate-900">
-            {num(ex.total_quantity)} × {req ? SPEC_LABEL[req.material_specification] ?? req.material_specification : 'material'}{' '}
-            <span className="font-normal text-slate-500">{req ? requirementSize(req, '×') : ''}</span>
+          <h2 id={`ex-${ex.id}`} className="text-lg font-medium tracking-[-0.02em] text-graphite">
+            {num(ex.total_quantity)} × {materialName(ex)}{' '}
+            <span className="font-mono text-sm font-normal text-slate-600">{req ? requirementSize(req, '×') : dims(ex.items[0]?.listing)}</span>
           </h2>
-          <p className="text-sm text-slate-500">
-            Buyer <strong className="text-slate-700">{ex.buyer?.name ?? orgName(ex.buyer_organization_id)}</strong>
-            {ex.buyer?.city ? ` · ${ex.buyer.city}` : ''} · requested {formatDate(ex.created_at)}
+          <p className="text-sm text-slate-600">
+            Buyer <span className="font-medium text-graphite">{buyerName}</span>
+            {ex.buyer?.city ? ` · ${ex.buyer.city}` : ''} · requested{' '}
+            <span className="font-mono text-xs">{formatDate(ex.created_at)}</span>
             {req && ex.total_quantity < req.required_quantity && (
               <> · partial ({num(ex.total_quantity)} of {num(req.required_quantity)} needed)</>
             )}
           </p>
         </div>
-        <div className="text-left lg:text-right shrink-0">
-          <div className="text-xs uppercase tracking-wider text-slate-500 font-semibold">Material value</div>
-          <div className="text-xl font-extrabold text-slate-900 tabular-nums">{bdt(ex.total_value_bdt)}</div>
-          <div className="text-xs text-slate-500">
+        <div className="shrink-0 text-left lg:text-right">
+          <div className="t-label">Material value</div>
+          <div className="text-xl font-medium tabular-nums tracking-[-0.02em] text-graphite">{bdt(ex.total_value_bdt)}</div>
+          <div className="text-xs text-slate-600">
             {ex.items.length} supplier item{ex.items.length === 1 ? '' : 's'} · excl. transport
           </div>
         </div>
       </div>
 
-      <div className="px-5 pt-4">
+      {/* Next action */}
+      <div
+        className={cn(
+          'mx-5 flex items-start gap-2 border-l-2 py-1 pl-3 text-sm sm:mx-6',
+          next.who === 'you'
+            ? 'border-copper font-medium text-copper-700'
+            : next.who === 'other'
+              ? 'border-graphite/20 text-slate-700'
+              : 'border-graphite/10 text-slate-600'
+        )}
+      >
+        <span className="t-label mt-0.5 shrink-0 text-inherit">{next.who === 'done' ? 'Outcome' : 'Next'}</span>
+        <span>{next.text}</span>
+      </div>
+
+      <div className="px-5 pt-5 sm:px-6">
         <Stepper ex={ex} />
       </div>
 
       {ex.stage === 'SUPPLIER_DECLINED' && (
-        <div className="mx-5 mt-4 p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-800 flex items-start gap-2">
-          <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
-          <span>
-            A supplier declined, so this exchange can&rsquo;t be completed. The buyer should cancel it to release any reserved
-            stock, then request again from the matches page.
-          </span>
-        </div>
+        <Note tone="danger" className="mx-5 mt-5 sm:mx-6">
+          A supplier declined, so this exchange can&rsquo;t be completed. The buyer should cancel it to release any reserved
+          stock, then request again from the matches page.
+        </Note>
       )}
 
-      {/* Items */}
-      <div className="p-5 overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-left text-xs uppercase tracking-wider text-slate-500 border-b border-slate-200">
-              <th className="py-2 pr-4 font-semibold">Supplier</th>
-              <th className="py-2 pr-4 font-semibold">Listing</th>
-              <th className="py-2 pr-4 font-semibold text-right">Qty</th>
-              <th className="py-2 pr-4 font-semibold text-right">Unit</th>
-              <th className="py-2 pr-4 font-semibold text-right">Subtotal</th>
-              <th className="py-2 pr-4 font-semibold">Status</th>
-              <th className="py-2 font-semibold text-right">Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {ex.items.map((item) => {
-              const meta = ITEM_STATUS_META[item.status];
-              const mine = actingAs === item.supplier_organization_id;
-              const canRespond = item.status === 'PENDING' && ex.status === 'PROPOSED';
-              return (
-                <tr key={item.id} className="border-b border-slate-100 last:border-0 align-top">
-                  <td className="py-3 pr-4">
-                    <div className="font-semibold text-slate-800">{item.supplier?.name ?? orgName(item.supplier_organization_id)}</div>
-                    <div className="text-xs text-slate-500">{item.listing?.city ?? item.supplier?.city}</div>
-                  </td>
-                  <td className="py-3 pr-4 text-slate-600">
-                    <div>{item.listing ? SPEC_LABEL[item.listing.material_specification] ?? item.listing.material_specification : '—'}</div>
-                    <div className="text-xs text-slate-500">
-                      {dims(item.listing)} · {item.listing?.condition?.toLowerCase()}
-                    </div>
-                    {item.listing && item.status === 'PENDING' && (
-                      <div className="text-xs text-slate-500">Available now: {num(item.listing.available_quantity)}</div>
-                    )}
-                  </td>
-                  <td className="py-3 pr-4 text-right font-semibold tabular-nums">{num(item.quantity)}</td>
-                  <td className="py-3 pr-4 text-right tabular-nums text-slate-600">{bdt(item.unit_price_bdt)}</td>
-                  <td className="py-3 pr-4 text-right tabular-nums">{bdt(item.subtotal_bdt)}</td>
-                  <td className={`py-3 pr-4 font-medium ${meta.className}`}>{meta.label}</td>
-                  <td className="py-3 text-right whitespace-nowrap">
-                    {canRespond && mine ? (
-                      <div className="inline-flex gap-2">
-                        <button
-                          onClick={() => onAct(ex, 'accept', item.id)}
-                          disabled={anyBusy}
-                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white text-xs font-bold"
-                        >
-                          {isBusy('accept', item.id) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-                          Accept &amp; reserve
-                        </button>
-                        <button
-                          onClick={() => onAct(ex, 'reject', item.id)}
-                          disabled={anyBusy}
-                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-50 disabled:opacity-60 text-slate-700 text-xs font-bold"
-                        >
-                          {isBusy('reject', item.id) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <X className="w-3.5 h-3.5" />}
-                          Decline
-                        </button>
+      {/* Supplier responsibilities: each supplier answers for their own line */}
+      <section className="mt-5 border-t rule" aria-label="Supplier items">
+        <p className="t-label px-5 pt-4 sm:px-6">Suppliers · each accepts or declines their own item</p>
+        <div className="overflow-x-auto px-5 pb-2 sm:px-6">
+          <table className="w-full min-w-[46rem] text-sm">
+            <thead>
+              <tr className="border-b rule text-left">
+                <th scope="col" className="t-label py-2.5 pr-4 font-medium">Supplier</th>
+                <th scope="col" className="t-label py-2.5 pr-4 font-medium">Listing</th>
+                <th scope="col" className="t-label py-2.5 pr-4 text-right font-medium">Qty</th>
+                <th scope="col" className="t-label py-2.5 pr-4 text-right font-medium">Unit</th>
+                <th scope="col" className="t-label py-2.5 pr-4 text-right font-medium">Subtotal</th>
+                <th scope="col" className="t-label py-2.5 pr-4 font-medium">Status</th>
+                <th scope="col" className="t-label py-2.5 text-right font-medium">Action</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-graphite/[0.08]">
+              {ex.items.map((item) => {
+                const meta = ITEM_STATUS_META[item.status];
+                const mine = actingAs === item.supplier_organization_id;
+                const canRespond = item.status === 'PENDING' && ex.status === 'PROPOSED';
+                return (
+                  <tr key={item.id} className={cn('align-top', mine && canRespond && 'bg-sand-50/70')}>
+                    <td className="py-3 pr-4">
+                      <div className="flex flex-wrap items-center gap-1.5 font-medium text-graphite">
+                        {item.supplier?.name ?? orgName(item.supplier_organization_id)}
+                        {mine && <Tag className="border-graphite/30 text-graphite">You</Tag>}
                       </div>
-                    ) : canRespond && onSwitch ? (
-                      <button
-                        onClick={() => onSwitch(item.supplier_organization_id)}
-                        className="text-xs font-semibold text-emerald-700 hover:underline"
-                        title="Demo: switch identity to this supplier"
-                      >
-                        Act as this supplier →
-                      </button>
-                    ) : (
-                      <span className="text-xs text-slate-400">—</span>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+                      <div className="text-xs text-slate-600">{item.listing?.city ?? item.supplier?.city}</div>
+                    </td>
+                    <td className="py-3 pr-4 text-slate-700">
+                      <div>{item.listing ? SPEC_LABEL[item.listing.material_specification] ?? item.listing.material_specification : '—'}</div>
+                      <div className="font-mono text-xs text-slate-600">
+                        {dims(item.listing)} · {item.listing?.condition?.toLowerCase()}
+                      </div>
+                      {item.listing && item.status === 'PENDING' && (
+                        <div className="text-xs text-slate-600">Available now: {num(item.listing.available_quantity)}</div>
+                      )}
+                    </td>
+                    <td className="py-3 pr-4 text-right font-medium tabular-nums text-graphite">{num(item.quantity)}</td>
+                    <td className="py-3 pr-4 text-right tabular-nums text-slate-600">{bdt(item.unit_price_bdt)}</td>
+                    <td className="py-3 pr-4 text-right tabular-nums text-graphite">{bdt(item.subtotal_bdt)}</td>
+                    <td className="py-3 pr-4">
+                      {meta ? <StatusBadge tone={meta.tone}>{meta.label}</StatusBadge> : item.status}
+                      {canRespond && !mine && <div className="mt-0.5 text-xs text-slate-600">Supplier to respond</div>}
+                    </td>
+                    <td className="whitespace-nowrap py-3 text-right">
+                      {canRespond && mine ? (
+                        <div className="inline-flex gap-2">
+                          <Button
+                            size="xs"
+                            variant="primary"
+                            onClick={() => onAct(ex, 'accept', item.id)}
+                            disabled={anyBusy}
+                            busy={isBusy('accept', item.id)}
+                            leading={<Check className="size-3.5" aria-hidden />}
+                          >
+                            Accept &amp; reserve
+                          </Button>
+                          <Button
+                            size="xs"
+                            variant="secondary"
+                            onClick={() => onConfirm({ ex, action: 'reject', itemId: item.id })}
+                            disabled={anyBusy}
+                            busy={isBusy('reject', item.id)}
+                            leading={<X className="size-3.5" aria-hidden />}
+                          >
+                            Decline
+                          </Button>
+                        </div>
+                      ) : canRespond && onSwitch ? (
+                        <Button
+                          variant="link"
+                          size="xs"
+                          onClick={() => onSwitch(item.supplier_organization_id)}
+                          title="Demo: switch identity to this supplier"
+                        >
+                          Act as this supplier →
+                        </Button>
+                      ) : (
+                        <span className="text-xs text-slate-500" aria-label="No action">—</span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </section>
 
-      {/* Buyer actions */}
+      {/* Buyer responsibilities */}
       {active && (
-        <div className="px-5 py-4 bg-slate-50 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <p className="text-xs text-slate-500">
-            {ex.stage === 'RESERVED' && needsPayment
-              ? `All suppliers accepted and the stock is reserved. Pay ${bdt(ex.total_value_bdt)} securely with SSLCommerz, then confirm the transfer.`
-              : ex.stage === 'RESERVED' && paid
-              ? `Paid ${bdt(ex.payment!.amount_bdt)} (ref ${ex.payment!.tran_id}). Confirm once the materials have been handed over.`
-              : ex.stage === 'RESERVED'
-              ? 'All suppliers accepted and the stock is reserved. Confirm once the materials have been handed over.'
-              : ex.stage === 'SUPPLIER_DECLINED'
-                ? 'Cancel to release the stock other suppliers reserved.'
-                : `Waiting for ${ex.counts.pending} supplier response${ex.counts.pending === 1 ? '' : 's'}.`}
-          </p>
+        <section
+          className="flex flex-col justify-between gap-3 border-t rule bg-cream/60 px-5 py-4 sm:flex-row sm:items-center sm:px-6"
+          aria-label="Buyer actions"
+        >
+          <div className="min-w-0 space-y-0.5">
+            <p className="t-label">Buyer · {buyerName}</p>
+            <p className="text-xs text-slate-600">
+              {ex.stage === 'RESERVED' && needsPayment
+                ? `All suppliers accepted and the stock is reserved. Pay ${bdt(ex.total_value_bdt)} securely with SSLCommerz, then confirm the transfer.`
+                : ex.stage === 'RESERVED' && paid
+                  ? `Paid ${bdt(ex.payment!.amount_bdt)} (ref ${ex.payment!.tran_id}). Confirm once the materials have been handed over.`
+                  : ex.stage === 'RESERVED'
+                    ? 'All suppliers accepted and the stock is reserved. Confirm once the materials have been handed over.'
+                    : ex.stage === 'SUPPLIER_DECLINED'
+                      ? 'Cancel to release the stock other suppliers reserved.'
+                      : `Waiting for ${ex.counts.pending} supplier response${ex.counts.pending === 1 ? '' : 's'}.`}
+            </p>
+          </div>
           {isBuyer ? (
-            <div className="flex gap-2">
-              <button
-                onClick={() => onAct(ex, 'cancel')}
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onConfirm({ ex, action: 'cancel' })}
                 disabled={anyBusy || paid}
+                busy={isBusy('cancel')}
                 title={paid ? 'Paid exchanges cannot be cancelled (refunds are not supported in this prototype)' : undefined}
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-slate-300 bg-white hover:bg-slate-100 disabled:opacity-60 text-slate-700 text-xs font-bold"
+                leading={<Undo2 className="size-3.5" aria-hidden />}
               >
-                {isBusy('cancel') ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Undo2 className="w-3.5 h-3.5" />}
                 Cancel exchange
-              </button>
+              </Button>
               {ex.stage === 'RESERVED' && needsPayment && (
-                <button
+                <Button
+                  variant="ink"
+                  size="sm"
                   onClick={() => onPay(ex)}
                   disabled={anyBusy}
-                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 disabled:opacity-60 text-white text-xs font-bold"
+                  busy={isBusy('pay')}
+                  leading={<CreditCard className="size-3.5" aria-hidden />}
                 >
-                  {isBusy('pay') ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CreditCard className="w-3.5 h-3.5" />}
                   Pay {bdt(ex.total_value_bdt)}
-                </button>
+                </Button>
               )}
-              <button
-                onClick={() => onAct(ex, 'complete')}
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => onConfirm({ ex, action: 'complete' })}
                 disabled={anyBusy || ex.stage !== 'RESERVED' || needsPayment}
+                busy={isBusy('complete')}
                 title={
                   ex.stage !== 'RESERVED' ? 'Every supplier must accept first' : needsPayment ? 'Pay for the exchange first' : undefined
                 }
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white text-xs font-bold"
+                leading={<PackageCheck className="size-3.5" aria-hidden />}
               >
-                {isBusy('complete') ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <PackageCheck className="w-3.5 h-3.5" />}
                 Confirm transfer
-              </button>
+              </Button>
             </div>
           ) : onSwitch ? (
-            <button
+            <Button
+              variant="link"
+              size="xs"
               onClick={() => onSwitch(ex.buyer_organization_id)}
-              className="text-xs font-semibold text-emerald-700 hover:underline self-start sm:self-auto"
+              className="self-start sm:self-auto"
               title="Demo: switch identity to the buyer"
             >
               Act as buyer →
-            </button>
+            </Button>
           ) : null}
-        </div>
+        </section>
       )}
 
       {/* Activity */}
-      <details className="group border-t border-slate-100">
-        <summary className="px-5 py-3 text-xs font-semibold text-slate-600 cursor-pointer flex items-center gap-1.5 list-none">
-          <ChevronDown className="w-3.5 h-3.5 transition group-open:rotate-180" />
-          Activity log ({ex.activity.length})
+      <details className="group border-t rule">
+        <summary className="flex cursor-pointer list-none items-center gap-1.5 px-5 py-3 text-xs font-medium text-slate-700 hover:text-graphite focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-copper sm:px-6 [&::-webkit-details-marker]:hidden">
+          <ChevronDown className="size-3.5 transition-transform duration-base ease-out group-open:rotate-180" aria-hidden />
+          Activity log <span className="font-mono text-[11px] text-slate-500">{ex.activity.length}</span>
         </summary>
-        <ol className="px-5 pb-4 space-y-2">
+        <ol className="space-y-2 px-5 pb-4 sm:px-6">
           {ex.activity.map((log) => {
             const actor = log.details?.actor_organization_id as string | undefined;
             return (
-              <li key={log.id} className="text-xs text-slate-600 flex gap-3">
-                <span className="font-mono text-slate-400 shrink-0">{formatDate(log.created_at)}</span>
+              <li key={log.id} className="flex gap-3 text-xs text-slate-700">
+                <span className="w-28 shrink-0 font-mono tabular-nums text-slate-600">{formatDate(log.created_at)}</span>
                 <span>
                   {ACTIVITY_LABEL[log.action] ?? log.action}
-                  {actor ? <span className="text-slate-400"> · {orgName(actor)}</span> : null}
+                  {actor ? <span className="text-slate-600"> · {orgName(actor)}</span> : null}
                   {typeof log.details?.quantity === 'number' ? (
-                    <span className="text-slate-400"> · {num(log.details.quantity as number)} pcs</span>
+                    <span className="text-slate-600"> · {num(log.details.quantity as number)} pcs</span>
                   ) : null}
                   {typeof log.details?.released_quantity === 'number' && (log.details.released_quantity as number) > 0 ? (
-                    <span className="text-slate-400"> · {num(log.details.released_quantity as number)} pcs released</span>
+                    <span className="text-slate-600"> · {num(log.details.released_quantity as number)} pcs released</span>
                   ) : null}
                 </span>
               </li>
@@ -621,6 +881,6 @@ function ExchangeCard({ ex, actingAs, highlighted, busy, onAct, onPay, onSwitch,
           })}
         </ol>
       </details>
-    </article>
+    </motion.article>
   );
 }

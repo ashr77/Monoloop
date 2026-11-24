@@ -1,13 +1,15 @@
 // ============================================================================
-// /matches/[requirementId] — results view (Member 3). Server component.
+// /matches/[requirementId] — results view (Member 3).
 // ============================================================================
 
 import Link from 'next/link';
 import { ArrowLeft, ArrowRight, Info } from 'lucide-react';
 import type { MaterialRequirement } from '@/lib/types';
 import { requirementSize } from '@/lib/dimensions';
+import { FactList, LinkButton, SectionHeading, StatusBadge, type Tone } from '@/components/ui';
+import { cn } from '@/lib/utils';
 import type { MatchResult } from '../types';
-import { PALETTE, SPEC_LABEL, SUPPLIER_COLORS, bdt, num, t, unitNoun } from './theme';
+import { PALETTE, SPEC_LABEL, SUPPLIER_COLORS, bdt, num, supplierInk, t, unitNoun } from './theme';
 import { EvaluationTable } from './EvaluationTable';
 import { RequestExchangeButton } from '@/features/exchanges/components/RequestExchangeButton';
 
@@ -25,24 +27,27 @@ export function MatchResultsView({ requirement, result }: Props) {
   }
 
   return (
-    <div className="mx-auto max-w-7xl space-y-14 px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
+    <div className="page-shell space-y-14 pb-16">
       <RequirementHeader requirement={requirement} />
       <ResultSummary requirement={requirement} result={result} />
 
       {result.allocations.length > 0 && (
         <section className="space-y-6" aria-labelledby="allocation-heading">
-          <SectionTitle index="01" id="allocation-heading" title="Proposed allocation" hint="Cheapest estimated delivered cost among all supplier combinations." />
+          <SectionHeading
+            index="01"
+            id="allocation-heading"
+            title="Proposed allocation"
+            hint="Cheapest estimated delivered cost among all supplier combinations."
+          />
           <AllocationBar result={result} colors={supplierColor} />
           <AllocationList result={result} colors={supplierColor} />
         </section>
       )}
 
-      {result.budget.status === 'OVER_BUDGET' && result.over_budget_alternative && (
-        <OverBudget result={result} />
-      )}
+      {result.budget.status === 'OVER_BUDGET' && result.over_budget_alternative && <OverBudget result={result} />}
 
       <section className="space-y-6" aria-labelledby="why-heading">
-        <SectionTitle
+        <SectionHeading
           index={result.allocations.length > 0 ? '02' : '01'}
           id="why-heading"
           title="Why each listing was accepted or rejected"
@@ -60,46 +65,44 @@ export function MatchResultsView({ requirement, result }: Props) {
 
 /* ---------------------------------------------------------------- header */
 
+const sentenceCase = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
 function RequirementHeader({ requirement: r }: { requirement: MaterialRequirement }) {
-  const facts: [string, string][] = [
-    ['Size', requirementSize(r)],
-    ['Condition', r.condition_requirement === 'ANY' ? 'Any' : r.condition_requirement.toLowerCase()],
-    ['Budget', r.maximum_budget_bdt == null ? 'No limit' : bdt(r.maximum_budget_bdt)],
-    ['Sourcing', r.allow_split_suppliers ? 'Multi-supplier allowed' : 'Single supplier only'],
+  const facts = [
+    { label: 'Size', value: requirementSize(r) },
+    { label: 'Condition', value: r.condition_requirement === 'ANY' ? 'Any' : sentenceCase(r.condition_requirement.toLowerCase()) },
+    { label: 'Budget', value: r.maximum_budget_bdt == null ? 'No limit' : bdt(r.maximum_budget_bdt) },
+    { label: 'Sourcing', value: r.allow_split_suppliers ? 'Multi-supplier allowed' : 'Single supplier only' },
   ];
   return (
-    <header className={`space-y-8 border-b pb-10 ${t.line}`}>
-      <Link href="/demand" className={`inline-flex items-center gap-2 text-sm ${t.muted} transition-colors hover:text-[#1d1d1d]`}>
-        <ArrowLeft className="size-4" /> Back to requirements
+    <header className="space-y-8 border-b rule pb-10 pt-8 sm:pt-10">
+      <Link
+        href="/demand"
+        className="inline-flex items-center gap-2 rounded-xs text-sm text-slate-600 transition-colors duration-fast hover:text-graphite"
+      >
+        <ArrowLeft className="size-4" aria-hidden /> Back to requirements
       </Link>
       <div className="space-y-4">
-        <p className={`${t.eyebrow} ${t.muted}`}>
+        <p className="t-eyebrow">
           Matching · {r.organization?.name ?? 'Buyer'} · <span className="normal-case">{r.id.slice(0, 8)}</span>
         </p>
-        <h1 className={`text-4xl leading-[1.02] sm:text-6xl ${t.display}`}>
+        <h1 className="text-heading-lg font-medium sm:text-display-md">
           {num(r.required_quantity)} × {SPEC_LABEL[r.material_specification] ?? r.material_specification}{' '}
-          <span className="text-[#1d1d1d]/40">{unitNoun(r.material_family)}</span>
+          <span className="text-slate-500">{unitNoun(r.material_family)}</span>
         </h1>
       </div>
-      <dl className={`grid grid-cols-2 border-l border-t lg:grid-cols-4 ${t.line}`}>
-        {facts.map(([k, v]) => (
-          <div key={k} className={`space-y-1.5 border-b border-r px-5 py-4 ${t.line}`}>
-            <dt className={`${t.eyebrow} ${t.faint}`}>{k}</dt>
-            <dd className="text-[15px] first-letter:uppercase">{v}</dd>
-          </div>
-        ))}
-      </dl>
+      <FactList facts={facts} columns={4} />
     </header>
   );
 }
 
 /* ------------------------------------------------------------- summary */
 
-const STATUS_COPY: Record<string, { label: string; tone: string }> = {
-  EXACT_MATCH: { label: 'Fulfilled by one supplier', tone: 'bg-[#d4b48c]/30 text-[#5c3d1e]' },
-  MULTI_SUPPLIER_MATCH: { label: 'Fulfilled by combining suppliers', tone: 'bg-[#d4b48c]/30 text-[#5c3d1e]' },
-  PARTIAL_MATCH: { label: 'Partially fulfillable', tone: 'bg-amber-100 text-amber-900' },
-  NO_MATCH: { label: 'No compatible stock', tone: 'bg-red-100/70 text-red-800' },
+const STATUS_COPY: Record<string, { label: string; tone: Tone }> = {
+  EXACT_MATCH: { label: 'Fulfilled by one supplier', tone: 'success' },
+  MULTI_SUPPLIER_MATCH: { label: 'Fulfilled by combining suppliers', tone: 'copper' },
+  PARTIAL_MATCH: { label: 'Partially fulfillable', tone: 'warning' },
+  NO_MATCH: { label: 'No compatible stock', tone: 'danger' },
 };
 
 function ResultSummary({ requirement, result }: Props) {
@@ -133,11 +136,11 @@ function ResultSummary({ requirement, result }: Props) {
 
   return (
     <section aria-label="Match summary" className="space-y-6">
-      <div className="flex flex-wrap items-center gap-3">
-        <span className={`${t.eyebrow} inline-flex items-center gap-1.5 px-2.5 py-1.5 ${status.tone}`}>
-          <span className="size-1.5 rounded-full bg-current" aria-hidden /> {status.label}
-        </span>
-        <span className={`${t.eyebrow} ${t.faint}`}>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <StatusBadge tone={status.tone} solid className="py-1 text-[13px]">
+          {status.label}
+        </StatusBadge>
+        <span className="t-label">
           {result.allocation_method === 'EXHAUSTIVE_OPTIMAL'
             ? 'Optimal allocation · all combinations checked'
             : result.allocation_method === 'GREEDY'
@@ -145,20 +148,30 @@ function ResultSummary({ requirement, result }: Props) {
               : `Engine v${result.engine_version}`}
         </span>
       </div>
-      <dl className={`grid grid-cols-2 border-l border-t bg-white lg:grid-cols-4 ${t.line}`}>
-        {stats.map(([k, v, note]) => (
-          <div key={k} className={`space-y-2 border-b border-r px-5 py-5 ${t.line}`}>
-            <dt className={`${t.eyebrow} ${t.faint}`}>{k}</dt>
-            <dd className={`text-2xl tabular-nums sm:text-3xl ${t.display}`}>{v}</dd>
-            <dd className={`text-xs ${t.faint}`}>{note}</dd>
+      <dl className="grid grid-cols-2 border-y rule lg:grid-cols-4">
+        {stats.map(([k, v, note], i) => (
+          <div
+            key={k}
+            className={cn(
+              'min-w-0 space-y-2 border-graphite/10 py-5 pr-4',
+              i % 2 === 1 && 'border-l pl-4',
+              i > 1 && 'border-t',
+              'lg:border-t-0 lg:px-6 lg:first:pl-0 lg:[&:not(:first-child)]:border-l'
+            )}
+          >
+            <dt className="t-label">{k}</dt>
+            <dd className={cn('text-2xl font-medium tabular-nums tracking-[-0.03em] sm:text-3xl', k === 'Allocated' ? 'text-copper-700' : 'text-graphite')}>
+              {v}
+            </dd>
+            <dd className="text-xs text-slate-600">{note}</dd>
           </div>
         ))}
       </dl>
       <ul className="space-y-2">
         {/* The over-budget panel below already states the budget message. */}
         {result.compatibility_explanations.filter((line) => !overBudget || line !== result.budget.message).map((line, i) => (
-          <li key={i} className={`flex gap-3 text-sm leading-relaxed ${t.muted}`}>
-            <span className={`${t.mono} mt-[3px] text-[11px] ${t.accentText}`}>{String(i + 1).padStart(2, '0')}</span>
+          <li key={i} className="flex max-w-3xl gap-3 text-sm leading-relaxed text-slate-700">
+            <span className="mt-[3px] font-mono text-[11px] text-copper-700">{String(i + 1).padStart(2, '0')}</span>
             <span>{line}</span>
           </li>
         ))}
@@ -173,24 +186,31 @@ function AllocationBar({ result, colors }: { result: MatchResult; colors: Map<st
   const total = Math.max(1, result.requested_quantity);
   return (
     <figure className="space-y-3">
-      <div className={`flex h-12 w-full overflow-hidden border ${t.line} bg-white`} role="img" aria-label={`${result.allocated_quantity} of ${result.requested_quantity} pieces allocated`}>
-        {result.allocations.map((a) => (
-          <div
-            key={a.listing_id}
-            className="flex h-full items-center justify-center overflow-hidden border-r border-white/70 text-xs font-medium"
-            style={{
-              width: `${(a.allocated_quantity / total) * 100}%`,
-              background: colors.get(a.supplier_organization_id),
-              color: ['#d4b48c', '#e8d5b9'].includes(colors.get(a.supplier_organization_id)!) ? PALETTE.ink : '#fff',
-            }}
-            title={`${a.supplier_name}: ${a.allocated_quantity} pcs`}
-          >
-            <span className="truncate px-2">{a.allocated_quantity}</span>
-          </div>
-        ))}
+      <div
+        className="flex h-12 w-full overflow-hidden rounded-sm border rule bg-cream-paper"
+        role="img"
+        aria-label={`${result.allocated_quantity} of ${result.requested_quantity} pieces allocated`}
+      >
+        {result.allocations.map((a) => {
+          const color = colors.get(a.supplier_organization_id);
+          return (
+            <div
+              key={a.listing_id}
+              className="flex h-full items-center justify-center overflow-hidden border-r border-cream-paper/80 font-mono text-xs font-medium tabular-nums"
+              style={{
+                width: `${(a.allocated_quantity / total) * 100}%`,
+                background: color,
+                color: supplierInk(color),
+              }}
+              title={`${a.supplier_name}: ${a.allocated_quantity} pcs`}
+            >
+              <span className="truncate px-2">{a.allocated_quantity}</span>
+            </div>
+          );
+        })}
         {result.unfulfilled_quantity > 0 && (
           <div
-            className={`flex h-full items-center justify-center text-xs ${t.muted}`}
+            className="flex h-full items-center justify-center font-mono text-xs text-slate-700"
             style={{
               width: `${(result.unfulfilled_quantity / total) * 100}%`,
               background: `repeating-linear-gradient(135deg, ${PALETTE.paperStrong} 0 6px, ${PALETTE.paper} 6px 12px)`,
@@ -201,15 +221,15 @@ function AllocationBar({ result, colors }: { result: MatchResult; colors: Map<st
           </div>
         )}
       </div>
-      <figcaption className={`flex flex-wrap gap-x-5 gap-y-1 text-xs ${t.muted}`}>
+      <figcaption className="flex flex-wrap gap-x-5 gap-y-1 text-xs text-slate-600">
         {Array.from(new Map(result.allocations.map((a) => [a.supplier_organization_id, a.supplier_name])).entries()).map(([id, name]) => (
           <span key={id} className="inline-flex items-center gap-2">
-            <span className="size-2.5" style={{ background: colors.get(id) }} aria-hidden /> {name}
+            <span className="size-2.5 rounded-xs" style={{ background: colors.get(id) }} aria-hidden /> {name}
           </span>
         ))}
         {result.unfulfilled_quantity > 0 && (
           <span className="inline-flex items-center gap-2">
-            <span className="size-2.5 border border-[#d8d4bb]" style={{ background: PALETTE.paperStrong }} aria-hidden /> Unfulfilled
+            <span className="size-2.5 rounded-xs border border-graphite/20" style={{ background: PALETTE.paperStrong }} aria-hidden /> Unfulfilled
           </span>
         )}
       </figcaption>
@@ -219,20 +239,20 @@ function AllocationBar({ result, colors }: { result: MatchResult; colors: Map<st
 
 function AllocationList({ result, colors }: { result: MatchResult; colors: Map<string, string> }) {
   return (
-    <ol className={`divide-y border-y ${t.line} divide-[#d8d4bb]`}>
+    <ol className="divide-y divide-graphite/10 border-y rule">
       {result.allocations.map((a, i) => (
         <li key={a.listing_id} className="grid gap-4 py-6 md:grid-cols-12 md:items-start">
           <div className="flex items-start gap-4 md:col-span-5">
-            <span className={`${t.mono} mt-1 text-xs ${t.accentText}`}>{String(i + 1).padStart(2, '0')}</span>
-            <div className="space-y-1">
-              <p className="flex items-center gap-2 text-lg font-medium tracking-[-0.02em]">
-                <span className="size-2.5 shrink-0" style={{ background: colors.get(a.supplier_organization_id) }} aria-hidden />
+            <span className="mt-1 font-mono text-xs text-copper-700">{String(i + 1).padStart(2, '0')}</span>
+            <div className="min-w-0 space-y-1">
+              <p className="flex items-center gap-2 text-lg font-medium tracking-[-0.02em] text-graphite">
+                <span className="size-2.5 shrink-0 rounded-xs" style={{ background: colors.get(a.supplier_organization_id) }} aria-hidden />
                 {a.supplier_name}
               </p>
-              <p className={`text-sm ${t.muted}`}>
-                {a.city} · {a.distance_km} km to buyer
+              <p className="text-sm text-slate-600">
+                {a.city} · <span className="font-mono tabular-nums">{a.distance_km} km</span> to buyer
               </p>
-              <p className={`text-sm ${t.muted}`}>{a.technical_notes}</p>
+              <p className="text-sm text-slate-600">{a.technical_notes}</p>
             </div>
           </div>
           <dl className="grid grid-cols-3 gap-4 text-sm md:col-span-7">
@@ -254,10 +274,10 @@ function OverBudget({ result }: { result: MatchResult }) {
   const alt = result.over_budget_alternative!;
   const qty = alt.reduce((s, a) => s + a.allocated_quantity, 0);
   return (
-    <section className="space-y-3 border border-red-200 bg-red-50/60 px-6 py-6" aria-label="Budget">
-      <p className={`${t.eyebrow} text-red-800`}>Over budget</p>
-      <p className="text-lg font-medium tracking-[-0.02em] text-red-900">{result.budget.message}</p>
-      <p className="text-sm text-red-900/80">
+    <section className="space-y-3 border-l-2 border-brick-600 bg-brick-50/60 px-6 py-6" aria-label="Budget">
+      <p className="t-eyebrow text-brick-700">Over budget</p>
+      <p className="text-lg font-medium tracking-[-0.02em] text-brick-700">{result.budget.message}</p>
+      <p className="max-w-3xl text-sm leading-relaxed text-graphite/85">
         Cheapest option considered: {alt.map((a) => `${a.allocated_quantity} from ${a.supplier_name}`).join(' + ')} ({qty} pcs,{' '}
         {bdt(result.budget.cheapest_estimated_cost_bdt ?? 0)} delivered). Raise the budget or reduce the quantity to proceed.
       </p>
@@ -270,20 +290,20 @@ function OverBudget({ result }: { result: MatchResult }) {
 function BaselineCallout({ requirement, result }: Props) {
   const b = result.baseline;
   return (
-    <section className="grid gap-6 border border-[#6e6a55]/30 bg-[#e9e4cf] px-6 py-6 text-[#4f4a2e] md:grid-cols-12" aria-label="Comparison with a name-only search">
+    <section className="grid gap-6 border-y border-sand-300 bg-sand-100 px-6 py-6 text-graphite md:grid-cols-12" aria-label="Comparison with a name-only search">
       <div className="space-y-2 md:col-span-4">
-        <p className={t.eyebrow}>Versus a name-only search</p>
-        <p className="text-3xl font-medium tracking-[-0.04em]">
+        <p className="t-eyebrow text-slate-700">Versus a name-only search</p>
+        <p className="text-3xl font-medium tabular-nums tracking-[-0.04em]">
           {b.incompatible_suggestion_ids.length} of {b.suggested_listing_ids.length}
         </p>
-        <p className="text-sm text-[#4f4a2e]/80">name matches would have been wrong</p>
+        <p className="text-sm text-slate-700">name matches would have been wrong</p>
       </div>
       <div className="space-y-2 text-sm leading-relaxed md:col-span-8">
         <p className="flex gap-2">
-          <Info className="mt-0.5 size-4 shrink-0" />
+          <Info className="mt-0.5 size-4 shrink-0 text-copper-700" aria-hidden />
           <span>{b.message}</span>
         </p>
-        <p className="text-[#4f4a2e]/80">
+        <p className="text-slate-700">
           A conventional listing search matches &ldquo;{SPEC_LABEL[requirement.material_specification] ?? requirement.material_specification}&rdquo; by name and would report{' '}
           {num(b.claimed_quantity)} pieces in stock. MONOLOOP checks size, thickness, condition and reservations, and finds{' '}
           {num(result.evaluations.filter((e) => e.compatible).reduce((s, e) => s + e.available_quantity, 0))} usable pieces.
@@ -298,24 +318,25 @@ function BaselineCallout({ requirement, result }: Props) {
 function ActionBar({ requirement, result }: Props) {
   const canRequest = result.allocations.length > 0;
   return (
-    <section className={`flex flex-col gap-4 border-t pt-8 sm:flex-row sm:items-center sm:justify-between ${t.line}`}>
-      <p className={`max-w-xl text-sm ${t.muted}`}>
+    <section className="flex flex-col gap-4 border-t rule pt-8 sm:flex-row sm:items-center sm:justify-between">
+      <p className="max-w-xl text-sm leading-relaxed text-slate-600">
         This is a proposal, not a reservation. Stock is re-checked and reserved only when each supplier accepts the exchange request.
       </p>
-      <div className="flex flex-wrap gap-3">
-        <Link href="/demand" className={t.btnSecondary}>
+      <div className="flex flex-wrap items-start gap-3">
+        <LinkButton href="/demand" variant="secondary">
           Back to requirements
-        </Link>
+        </LinkButton>
         {canRequest ? (
-          <RequestExchangeButton
-            requirementId={requirement.id}
-            buyerOrganizationId={requirement.organization_id}
-            className={t.btnInk}
-          />
+          <RequestExchangeButton requirementId={requirement.id} buyerOrganizationId={requirement.organization_id} className={t.btnPrimary} />
         ) : (
-          <Link href="/demand" className={t.btnInk} aria-label={`Adjust requirement ${requirement.id}`}>
-            Adjust requirement <ArrowRight className="size-4" />
-          </Link>
+          <LinkButton
+            href="/demand"
+            variant="ink"
+            aria-label={`Adjust requirement ${requirement.id}`}
+            trailing={<ArrowRight className="size-4" aria-hidden />}
+          >
+            Adjust requirement
+          </LinkButton>
         )}
       </div>
     </section>
@@ -324,26 +345,12 @@ function ActionBar({ requirement, result }: Props) {
 
 /* --------------------------------------------------------------- bits */
 
-function SectionTitle({ index, id, title, hint }: { index: string; id: string; title: string; hint?: string }) {
-  return (
-    <div className="flex flex-col gap-2 md:flex-row md:items-baseline md:gap-6">
-      <span className={`${t.mono} text-sm ${t.accentText}`}>{index}</span>
-      <div className="space-y-1">
-        <h2 id={id} className={`text-2xl sm:text-3xl ${t.heading}`}>
-          {title}
-        </h2>
-        {hint && <p className={`text-sm ${t.muted}`}>{hint}</p>}
-      </div>
-    </div>
-  );
-}
-
 function Fact({ label, value, note }: { label: string; value: string; note?: string }) {
   return (
     <div className="space-y-1">
-      <dt className={`${t.eyebrow} ${t.faint}`}>{label}</dt>
-      <dd className="tabular-nums">{value}</dd>
-      {note && <dd className={`text-xs ${t.faint}`}>{note}</dd>}
+      <dt className="t-label">{label}</dt>
+      <dd className="tabular-nums text-graphite">{value}</dd>
+      {note && <dd className="text-xs text-slate-600">{note}</dd>}
     </div>
   );
 }

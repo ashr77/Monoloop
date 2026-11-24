@@ -8,55 +8,63 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
-import { AlertTriangle, ArrowLeftRight, CheckCircle2, FileText, KeyRound, Loader2, Package, ShieldCheck } from 'lucide-react';
+import { useEffect, useState, type FormEvent } from 'react';
+import { ArrowUpRight, CheckCircle2, ShieldCheck } from 'lucide-react';
 import { useAuth } from '@/lib/auth/AuthProvider';
 import { updateProfile } from '@/lib/auth/session';
 import { api } from '@/lib/api/endpoints';
 import { ApiError, errorMessage } from '@/lib/api/client';
 import { BANGLADESH_CITIES } from '@/lib/constants';
 import { useExchanges, useListings, useRequirements } from '@/hooks';
+import { Button, ConfirmDialog, LinkButton, Note, PageHeader, SectionHeading, StatusBadge, type Tone } from '@/components/ui';
+import { cn } from '@/lib/utils';
 import { Field, FormError } from '@/features/auth/AuthCard';
 
-const STATUS_STYLE: Record<string, string> = {
-  APPROVED: 'bg-emerald-50 text-emerald-800 border-emerald-200',
-  PENDING: 'bg-amber-50 text-amber-800 border-amber-200',
-  REJECTED: 'bg-red-50 text-red-800 border-red-200',
-  SUSPENDED: 'bg-slate-100 text-slate-700 border-slate-300',
+const STATUS: Record<string, { tone: Tone; label: string }> = {
+  APPROVED: { tone: 'success', label: 'Verified company' },
+  PENDING: { tone: 'warning', label: 'Pending review' },
+  REJECTED: { tone: 'danger', label: 'Rejected' },
+  SUSPENDED: { tone: 'muted', label: 'Suspended' },
 };
 
 export default function AccountPage() {
   const { mode, profile } = useAuth();
   if (mode !== 'jwt') {
-    return <p className="mx-auto max-w-3xl px-4 py-16 text-sm text-slate-600">Accounts are available when login is on (AUTH_MODE=jwt).</p>;
+    return (
+      <div className="page-shell py-16">
+        <p className="text-sm text-slate-600">Accounts are available when login is on (AUTH_MODE=jwt).</p>
+      </div>
+    );
   }
   if (!profile) return null;
   const org = profile.organization;
+  const status = org ? STATUS[org.status] ?? { tone: 'neutral' as Tone, label: org.status } : null;
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
-      <header className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0">
-          <span className="inline-flex rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-800">My account</span>
-          <h1 className="mt-1 truncate text-2xl font-extrabold tracking-tight text-slate-900">
-            {org ? org.name : 'Super admin'}
-          </h1>
-          <p className="mt-1 text-sm text-slate-500">{profile.email}</p>
-        </div>
-        {org ? (
-          <span className={`self-start rounded-full border px-3 py-1 text-xs font-semibold sm:self-center ${STATUS_STYLE[org.status]}`}>
-            {org.status === 'APPROVED' ? 'Verified company' : org.status}
-          </span>
-        ) : (
-          <Link href="/admin" className="inline-flex items-center gap-1 self-start text-sm font-semibold text-emerald-700 hover:underline">
-            <ShieldCheck className="h-4 w-4" /> Review applications →
-          </Link>
-        )}
-      </header>
+    <div className="page-shell pb-20">
+      <PageHeader
+        eyebrow="My account"
+        title={<span className="block truncate">{org ? org.name : 'Super admin'}</span>}
+        description={profile.email}
+        actions={
+          status ? (
+            <StatusBadge tone={status.tone} solid>
+              {status.label}
+            </StatusBadge>
+          ) : (
+            <LinkButton href="/admin" variant="secondary" size="sm" leading={<ShieldCheck className="size-4" aria-hidden />}>
+              Review applications
+            </LinkButton>
+          )
+        }
+      >
+        {org && <Overview organizationId={org.id} />}
+      </PageHeader>
 
-      {org && <Overview organizationId={org.id} />}
-      {org && <CompanyDetails />}
-      <PasswordSection />
+      <div className="divide-y divide-graphite/10">
+        {org && <CompanyDetails />}
+        <PasswordSection index={org ? '02' : '01'} />
+      </div>
     </div>
   );
 }
@@ -70,29 +78,43 @@ function Overview({ organizationId }: { organizationId: string }) {
   const active = exchanges.filter((e) => e.stage !== 'COMPLETED' && e.stage !== 'CANCELLED');
   const completed = exchanges.filter((e) => e.stage === 'COMPLETED');
 
-  return (
-    <section className="grid grid-cols-2 gap-4 lg:grid-cols-4" aria-label="My activity">
-      <Card href="/supply" icon={<Package className="h-4 w-4 text-emerald-600" />} label="Active listings"
-        value={listings.filter((l) => l.status === 'ACTIVE').length} note={`${listings.length} in total`} />
-      <Card href="/demand" icon={<FileText className="h-4 w-4 text-emerald-600" />} label="Open requirements"
-        value={requirements.filter((r) => r.status === 'OPEN').length} note={`${requirements.length} in total`} />
-      <Card href="/exchanges" icon={<ArrowLeftRight className="h-4 w-4 text-emerald-600" />} label="Active exchanges"
-        value={active.length} note="as buyer or supplier" />
-      <Card href="/exchanges" icon={<CheckCircle2 className="h-4 w-4 text-emerald-600" />} label="Completed"
-        value={completed.length} note={`${completed.filter((e) => e.payment?.status === 'PAID').length} paid online`} />
-    </section>
-  );
-}
+  const items = [
+    { href: '/supply', label: 'Active listings', value: listings.filter((l) => l.status === 'ACTIVE').length, note: `${listings.length} in total` },
+    { href: '/demand', label: 'Open requirements', value: requirements.filter((r) => r.status === 'OPEN').length, note: `${requirements.length} in total` },
+    { href: '/exchanges', label: 'Active exchanges', value: active.length, note: 'as buyer or supplier' },
+    {
+      href: '/exchanges',
+      label: 'Completed',
+      value: completed.length,
+      note: `${completed.filter((e) => e.payment?.status === 'PAID').length} paid online`,
+    },
+  ];
 
-function Card({ href, icon, label, value, note }: { href: string; icon: ReactNode; label: string; value: number; note: string }) {
   return (
-    <Link href={href} className="space-y-1 rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-emerald-300">
-      <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-slate-500">
-        {label} {icon}
-      </div>
-      <div className="text-2xl font-extrabold tabular-nums text-slate-900">{value}</div>
-      <div className="text-xs text-slate-500">{note}</div>
-    </Link>
+    <section aria-label="My activity" className="grid grid-cols-2 border-y rule lg:grid-cols-4">
+      {items.map((m, i) => (
+        <Link
+          key={m.label}
+          href={m.href}
+          className={cn(
+            'group min-w-0 space-y-1 border-graphite/10 px-4 py-4 transition-colors duration-fast hover:bg-sand-50',
+            i % 2 === 1 && 'border-l',
+            i > 1 && 'border-t lg:border-t-0',
+            i === 2 && 'lg:border-l'
+          )}
+        >
+          <span className="t-label flex items-center justify-between gap-2">
+            <span className="truncate">{m.label}</span>
+            <ArrowUpRight
+              className="size-3.5 shrink-0 text-slate-500 transition-transform duration-fast group-hover:-translate-y-0.5 group-hover:translate-x-0.5"
+              aria-hidden
+            />
+          </span>
+          <span className="block text-2xl font-medium tabular-nums tracking-[-0.03em] text-graphite">{m.value}</span>
+          <span className="block truncate text-xs text-slate-600">{m.note}</span>
+        </Link>
+      ))}
+    </section>
   );
 }
 
@@ -106,6 +128,7 @@ function CompanyDetails() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const [confirming, setConfirming] = useState(false);
 
   useEffect(() => {
     setForm({ company_name: org.name, license_number: org.license_number ?? '', city: org.city, address: org.address ?? '' });
@@ -115,12 +138,18 @@ function CompanyDetails() {
     form.company_name.trim() !== org.name || form.license_number.trim().toLowerCase() !== (org.license_number ?? '').toLowerCase();
   const dirty = identityChanged || form.city !== org.city || form.address.trim() !== (org.address ?? '');
 
-  async function save(e: FormEvent) {
+  function save(e: FormEvent) {
     e.preventDefault();
-    if (identityChanged &&
-        !window.confirm('Changing the company name or licence number sends your account back to admin approval. You cannot trade until it is approved again. Continue?')) {
+    if (busy) return;
+    // A new name or licence number sends the account back to admin approval: confirm first.
+    if (identityChanged) {
+      setConfirming(true);
       return;
     }
+    void persist();
+  }
+
+  async function persist() {
     setBusy(true);
     setError(null);
     setSaved(false);
@@ -138,50 +167,70 @@ function CompanyDetails() {
       setError(errorMessage(err, 'Could not save your details.'));
     } finally {
       setBusy(false);
+      setConfirming(false);
     }
   }
 
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-      <h2 className="text-lg font-bold text-slate-900">Company details</h2>
-      <p className="mt-1 text-sm text-slate-500">City and address update immediately. A new name or licence number is re-verified by an admin.</p>
-      <form onSubmit={save} className="mt-5 space-y-4">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+    <section aria-labelledby="company-details" className="grid gap-8 py-12 lg:grid-cols-12">
+      <SectionHeading
+        id="company-details"
+        index="01"
+        title="Company details"
+        hint="City and address update immediately. A new name or licence number is re-verified by an admin."
+        className="lg:col-span-4"
+      />
+      <form onSubmit={save} className="space-y-5 lg:col-span-8">
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
           <Field label="Company name" required value={form.company_name} onChange={(e) => setForm({ ...form, company_name: e.target.value })} />
-          <Field label="Trade licence number" required value={form.license_number}
-            onChange={(e) => setForm({ ...form, license_number: e.target.value })} />
+          <Field
+            label="Trade licence number"
+            required
+            value={form.license_number}
+            onChange={(e) => setForm({ ...form, license_number: e.target.value })}
+          />
           <label className="block">
-            <span className="text-sm font-semibold text-slate-700">City</span>
-            <select value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })}
-              className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-200">
-              {Array.from(new Set([org.city, ...BANGLADESH_CITIES])).map((c) => <option key={c}>{c}</option>)}
+            <span className="field-label">City</span>
+            <select value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} className="field mt-1.5">
+              {Array.from(new Set([org.city, ...BANGLADESH_CITIES])).map((c) => (
+                <option key={c}>{c}</option>
+              ))}
             </select>
           </label>
           <Field label="Address" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
         </div>
         <Field label="Login email" value={profile!.email} disabled hint="The login email cannot be changed here." />
 
-        {identityChanged && (
-          <p className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" /> Saving a new name or licence number pauses trading until an admin approves it again.
-          </p>
-        )}
+        {identityChanged && <Note tone="warning">Saving a new name or licence number pauses trading until an admin approves it again.</Note>}
         <FormError message={error} />
-        <div className="flex items-center gap-3">
-          <button type="submit" disabled={!dirty || busy}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300">
-            {busy && <Loader2 className="h-4 w-4 animate-spin" />} Save changes
-          </button>
-          {saved && !dirty && <span className="inline-flex items-center gap-1 text-sm text-emerald-700"><CheckCircle2 className="h-4 w-4" /> Saved</span>}
+        <div className="flex flex-wrap items-center gap-4">
+          <Button type="submit" variant="primary" disabled={!dirty} busy={busy}>
+            Save changes
+          </Button>
+          {saved && !dirty && (
+            <span role="status" className="inline-flex items-center gap-1.5 text-sm text-moss-700">
+              <CheckCircle2 className="size-4" aria-hidden /> Saved
+            </span>
+          )}
         </div>
       </form>
+
+      <ConfirmDialog
+        open={confirming}
+        onClose={() => setConfirming(false)}
+        onConfirm={() => void persist()}
+        busy={busy}
+        title="Send your account back for approval?"
+        description="Changing the company name or licence number sends your account back to admin approval. You cannot trade until it is approved again."
+        confirmLabel="Save and resubmit"
+      />
     </section>
   );
 }
 
 // ---------------------------------------------------------------------------- password
 
-function PasswordSection() {
+function PasswordSection({ index }: { index: string }) {
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -215,23 +264,51 @@ function PasswordSection() {
   }
 
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-      <h2 className="flex items-center gap-2 text-lg font-bold text-slate-900"><KeyRound className="h-5 w-5 text-slate-500" /> Password</h2>
-      <form onSubmit={submit} className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-3" noValidate>
-        <Field label="Current password" type="password" autoComplete="current-password" required value={current}
-          onChange={(e) => setCurrent(e.target.value)} error={fieldError.current} />
-        <Field label="New password" type="password" autoComplete="new-password" required value={next}
-          onChange={(e) => setNext(e.target.value)} error={fieldError.next} />
-        <Field label="Confirm new password" type="password" autoComplete="new-password" required value={confirm}
-          onChange={(e) => setConfirm(e.target.value)} error={fieldError.confirm} />
-        <div className="flex items-center gap-3 sm:col-span-3">
-          <button type="submit" disabled={busy || !current || !next}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-800 hover:bg-slate-50 disabled:opacity-50">
-            {busy && <Loader2 className="h-4 w-4 animate-spin" />} Change password
-          </button>
-          {done && <span className="inline-flex items-center gap-1 text-sm text-emerald-700"><CheckCircle2 className="h-4 w-4" /> Password changed</span>}
+    <section aria-labelledby="password" className="grid gap-8 py-12 lg:grid-cols-12">
+      <SectionHeading id="password" index={index} title="Password" className="lg:col-span-4" />
+      <form onSubmit={submit} className="grid grid-cols-1 gap-5 sm:grid-cols-3 lg:col-span-8" noValidate>
+        <Field
+          label="Current password"
+          type="password"
+          autoComplete="current-password"
+          required
+          value={current}
+          onChange={(e) => setCurrent(e.target.value)}
+          error={fieldError.current}
+        />
+        <Field
+          label="New password"
+          type="password"
+          autoComplete="new-password"
+          required
+          value={next}
+          onChange={(e) => setNext(e.target.value)}
+          error={fieldError.next}
+        />
+        <Field
+          label="Confirm new password"
+          type="password"
+          autoComplete="new-password"
+          required
+          value={confirm}
+          onChange={(e) => setConfirm(e.target.value)}
+          error={fieldError.confirm}
+        />
+        {error && (
+          <div className="sm:col-span-3">
+            <FormError message={error} />
+          </div>
+        )}
+        <div className="flex flex-wrap items-center gap-4 sm:col-span-3">
+          <Button type="submit" variant="ink" disabled={!current || !next} busy={busy}>
+            Change password
+          </Button>
+          {done && (
+            <span role="status" className="inline-flex items-center gap-1.5 text-sm text-moss-700">
+              <CheckCircle2 className="size-4" aria-hidden /> Password changed
+            </span>
+          )}
         </div>
-        <div className="sm:col-span-3"><FormError message={error} /></div>
       </form>
     </section>
   );
