@@ -40,6 +40,16 @@ class Settings(BaseSettings):
     supabase_jwks_url: str = ""
     jwt_audience: str = "authenticated"
 
+    # --- Payments (SSLCommerz) --------------------------------------------------
+    # "none" turns online payment off: exchanges complete without payment, as before.
+    payment_provider: Literal["none", "sslcommerz"] = "none"
+    sslcommerz_store_id: str = ""
+    sslcommerz_store_password: str = ""
+    sslcommerz_sandbox: bool = True
+    # Where the browser reaches this API (gateway redirects back here) and the frontend.
+    public_api_url: str = "http://localhost:8000"
+    frontend_url: str = "http://localhost:3000"
+
     # --- AI extraction ------------------------------------------------------
     ai_provider: Literal["gemini", "openai"] = "gemini"
     ai_api_key: str = ""
@@ -92,6 +102,11 @@ class Settings(BaseSettings):
             if url.startswith(prefix):
                 return "postgresql+asyncpg://" + url[len(prefix):]
         return url
+
+    @property
+    def payment_configured(self) -> bool:
+        return (self.payment_provider == "sslcommerz" and bool(self.sslcommerz_store_id.strip())
+                and bool(self.sslcommerz_store_password.strip()))
 
     @property
     def max_transcribe_body_bytes(self) -> int:

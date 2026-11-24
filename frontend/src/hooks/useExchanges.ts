@@ -40,3 +40,11 @@ export function useExchangeAction() {
     onSuccess: () => invalidateInventory(qc),
   });
 }
+
+/** Starts the gateway payment; on success the caller redirects the browser to gateway_url. */
+export function useStartPayment() {
+  return useMutation({
+    mutationFn: (v: { exchangeId: string; organizationId: string }) =>
+      api.payments.start(v.exchangeId, v.organizationId),
+  });
+}

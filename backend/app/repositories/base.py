@@ -14,6 +14,7 @@ from typing import Literal, Protocol
 
 from app.schemas.entities import Listing, Organization, Requirement
 from app.schemas.exchange import ExchangeView
+from app.schemas.payment import PaymentRecord
 
 ExchangeActionName = Literal["accept", "reject", "complete", "cancel"]
 
@@ -80,6 +81,16 @@ class ExchangeRepository(Protocol):
     async def act(self, action: ExchangeActionName, exchange_id: str, actor_id: str, item_id: str | None) -> None: ...
 
 
+class PaymentRepository(Protocol):
+    async def create(self, data: dict) -> PaymentRecord: ...
+    async def get_by_tran_id(self, tran_id: str) -> PaymentRecord | None: ...
+    async def for_exchanges(self, exchange_ids: list[str]) -> list[PaymentRecord]: ...
+    async def set_session(self, tran_id: str, session_key: str) -> None: ...
+    async def finalize(self, tran_id: str, status: str, fields: dict) -> PaymentRecord | None:
+        """INITIATED -> status in one conditional update. Returns None if it was not INITIATED."""
+        ...
+
+
 @dataclass(slots=True)
 class Repositories:
     """The unit the rest of the app receives through dependency injection."""
@@ -89,3 +100,4 @@ class Repositories:
     requirements: RequirementRepository
     exchanges: ExchangeRepository
     backend: Literal["memory", "postgres", "supabase"]
+    payments: PaymentRepository | None = None
