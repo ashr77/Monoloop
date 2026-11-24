@@ -174,3 +174,18 @@ async def test_extraction_does_not_retry_client_errors():
         await c.post("/api/ai/extract-material", json={"prompt": PROMPT_JA})
     await container.aclose()
     assert len(calls) == 1
+
+
+@pytest.mark.parametrize("prompt", [
+    "আমার ১০০ পিস SS304 স্টেইনলেস স্টিল শিট লাগবে, দৈর্ঘ্য ১৫০০ থেকে ২০০০ মিমি, প্রস্থ ৮০০ থেকে ১০০০ মিমি, "
+    "পুরুত্ব ২ থেকে ৩ মিমি, বাজেট ৫০০০০ টাকা",
+    "SS304ステンレス鋼板が100枚必要です。長さ1500から2000ミリ、幅800から1000ミリ、厚さ2から3ミリ、予算50000タカ",
+])
+def test_requirement_parser_understands_spoken_bangla_and_japanese(prompt):
+    from app.services.ai.extraction import extract_requirement_with_heuristics
+
+    r = extract_requirement_with_heuristics(prompt)
+    assert (r.material_family, r.material_specification) == ("STAINLESS_STEEL_SHEET", "SS304")
+    assert (r.length_min_mm, r.length_max_mm, r.width_min_mm, r.width_max_mm) == (1500, 2000, 800, 1000)
+    assert (r.thickness_min_mm, r.thickness_max_mm) == (2, 3)
+    assert r.required_quantity == 100 and r.maximum_budget_bdt == 50000
