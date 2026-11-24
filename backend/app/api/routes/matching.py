@@ -24,9 +24,11 @@ class MatchOverviewRow(BaseModel):
 
 
 @router.get("/matches", response_model=ApiResponse[list[MatchOverviewRow]])
-async def match_all_open(c: ContainerDep):
-    """Live match status of every OPEN requirement (computed in two queries in total)."""
-    rows = await c.matching.match_all_open()
+async def match_all_open(request: Request, c: ContainerDep):
+    """Live match status of OPEN requirements (computed in two queries in total).
+    With AUTH_MODE=jwt a company sees only its own requirements; admins see all of them."""
+    actor = await resolve_actor(request, c.settings) if c.settings.auth_mode == "jwt" else None
+    rows = await c.matching.match_all_open(actor)
     fulfilled = sum(1 for _, r in rows if r.unfulfilled_quantity == 0 and r.allocations)
     return ok([{"requirement": req, "result": res} for req, res in rows], total=len(rows), fulfillable=fulfilled)
 
