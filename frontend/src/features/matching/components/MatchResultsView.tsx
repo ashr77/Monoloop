@@ -137,7 +137,7 @@ function ResultSummary({ requirement, result }: Props) {
   return (
     <section aria-label="Match summary" className="space-y-6">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <StatusBadge tone={status.tone} solid className="py-1 text-[13px]">
+        <StatusBadge tone={status.tone} className="py-1 text-[14px]">
           {status.label}
         </StatusBadge>
         <span className="t-label">
@@ -171,7 +171,7 @@ function ResultSummary({ requirement, result }: Props) {
         {/* The over-budget panel below already states the budget message. */}
         {result.compatibility_explanations.filter((line) => !overBudget || line !== result.budget.message).map((line, i) => (
           <li key={i} className="flex max-w-3xl gap-3 text-sm leading-relaxed text-slate-700">
-            <span className="mt-[3px] font-mono text-[11px] text-copper-700">{String(i + 1).padStart(2, '0')}</span>
+            <span className="mt-[3px] font-mono text-xs text-copper-700">{String(i + 1).padStart(2, '0')}</span>
             <span>{line}</span>
           </li>
         ))}

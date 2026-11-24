@@ -303,7 +303,7 @@ function Bubble({ message, mine }: { message: ChatMessage; mine: boolean }) {
       >
         {message.body}
       </p>
-      <time dateTime={message.created_at} className="mt-1 font-mono text-[11px] tabular-nums text-slate-600">
+      <time dateTime={message.created_at} className="mt-1 font-mono text-xs tabular-nums text-slate-600">
         {time(message.created_at)}
       </time>
     </div>

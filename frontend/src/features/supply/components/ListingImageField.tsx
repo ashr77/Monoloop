@@ -189,7 +189,7 @@ export function ListingImageField({
                 type="button"
                 onClick={() => inputRef.current?.click()}
                 disabled={uploading}
-                className="inline-flex h-8 items-center gap-1.5 rounded-sm border border-graphite/20 px-3 text-[13px] font-medium text-graphite hover:border-graphite/45 disabled:opacity-50"
+                className="inline-flex h-8 items-center gap-1.5 rounded-sm border border-graphite/20 px-3 text-[14px] font-medium text-graphite hover:border-graphite/45 disabled:opacity-50"
               >
                 <RefreshCw className="size-3.5" aria-hidden /> Replace
               </button>
@@ -200,7 +200,7 @@ export function ListingImageField({
                   setError(null);
                 }}
                 disabled={uploading}
-                className="inline-flex h-8 items-center gap-1.5 rounded-sm px-3 text-[13px] font-medium text-brick-700 hover:bg-brick-50 disabled:opacity-50"
+                className="inline-flex h-8 items-center gap-1.5 rounded-sm px-3 text-[14px] font-medium text-brick-700 hover:bg-brick-50 disabled:opacity-50"
               >
                 <Trash2 className="size-3.5" aria-hidden /> Remove
               </button>
@@ -232,7 +232,7 @@ export function ListingImageField({
           <span className="text-sm font-medium text-graphite">
             {uploading ? 'Uploading photo…' : dragging ? 'Drop to upload' : 'Drag a photo here, or click to browse'}
           </span>
-          <span className="font-mono text-[11px] text-slate-600">JPEG, PNG or WebP · up to 20 MB · you can also paste an image</span>
+          <span className="font-mono text-xs text-slate-600">JPEG, PNG or WebP · up to 20 MB · you can also paste an image</span>
         </button>
       )}
 

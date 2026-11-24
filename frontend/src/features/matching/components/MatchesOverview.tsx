@@ -198,7 +198,7 @@ export function MatchesOverview() {
                               <p className="font-mono text-xs text-slate-600">{requirementSize(req, '×')}</p>
                             </div>
                             <div className="space-y-2 md:col-span-4">
-                              <StatusBadge tone={TONE[bucket]} solid>
+                              <StatusBadge tone={TONE[bucket]}>
                                 {statusLabel(r)}
                               </StatusBadge>
                               <div className="h-1 w-full overflow-hidden rounded-xs bg-graphite/[0.08]" aria-hidden>

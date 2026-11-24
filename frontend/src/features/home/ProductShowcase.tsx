@@ -147,8 +147,8 @@ function Frame({ path, children }: { path: string; children: ReactNode }) {
           <span className="size-2 rounded-full bg-graphite/15" />
           <span className="size-2 rounded-full bg-graphite/15" />
         </span>
-        <span className="truncate font-mono text-[11px] text-slate-600">monoloop{path.split('?')[0]}</span>
-        <span className="ml-auto inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.08em] text-slate-600">
+        <span className="truncate font-mono text-xs text-slate-600">monoloop{path.split('?')[0]}</span>
+        <span className="ml-auto inline-flex items-center gap-1.5 font-mono text-xs uppercase tracking-[0.08em] text-slate-600">
           <span className="size-1.5 rounded-full bg-copper" aria-hidden /> Live data
         </span>
       </div>
@@ -177,7 +177,7 @@ function Rows({ n = 5 }: { n?: number }) {
 
 function ViewAll({ href, label }: { href: string; label: string }) {
   return (
-    <Link href={href} className="group mt-5 inline-flex items-center gap-1.5 text-[13px] font-medium text-copper-700">
+    <Link href={href} className="group mt-5 inline-flex items-center gap-1.5 text-[14px] font-medium text-copper-700">
       {label}
       <ArrowRight className="size-3.5 transition-transform duration-base group-hover:translate-x-0.5" aria-hidden />
     </Link>
@@ -206,7 +206,7 @@ function MarketPreview() {
   return (
     <div>
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[36rem] text-left text-[13px]">
+        <table className="w-full min-w-[36rem] text-left text-[14px]">
           <thead>
             <tr className="border-b border-graphite/10">
               {['Material', 'Size (mm)', 'Available', 'Unit price', 'Location'].map((h, i) => (
@@ -254,13 +254,13 @@ function InventoryPreview() {
   if (picked.length === 0) return <p className="py-16 text-center text-sm text-slate-600">No active listings yet.</p>;
   return (
     <div className="space-y-5">
-      <p className="font-mono text-[11px] uppercase tracking-[0.08em] text-slate-600">Available = Total − Reserved</p>
+      <p className="font-mono text-xs uppercase tracking-[0.08em] text-slate-600">Available = Total − Reserved</p>
       <ul className="space-y-5">
         {picked.map((l, i) => {
           const total = Math.max(1, l.total_quantity);
           return (
             <li key={l.id} className="space-y-2">
-              <div className="flex items-baseline justify-between gap-4 text-[13px]">
+              <div className="flex items-baseline justify-between gap-4 text-[14px]">
                 <span className="min-w-0 truncate">
                   <span className="font-medium">{SPEC_LABEL[l.material_specification] ?? l.material_specification}</span>{' '}
                   <span className="text-slate-600">· {l.organization?.name ?? l.city}</span>
@@ -366,7 +366,7 @@ function MatchingPreview() {
           </p>
           <p className="font-mono text-xs text-slate-600">{requirementSize(req, '×')}</p>
         </div>
-        <StatusBadge tone={tone} solid>
+        <StatusBadge tone={tone}>
           {statusText}
         </StatusBadge>
       </div>
@@ -383,7 +383,7 @@ function MatchingPreview() {
       </div>
       {evaluation && (
         <div className="space-y-2">
-          <p className="text-[13px] text-slate-700">
+          <p className="text-[14px] text-slate-700">
             Why <span className="font-medium text-graphite">{evaluation.supplier_name}</span>&rsquo;s listing{' '}
             {evaluation.compatible ? 'qualifies' : 'was rejected'}:
           </p>
@@ -394,7 +394,7 @@ function MatchingPreview() {
                 initial={{ opacity: 0, x: -4 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.15 + i * 0.05, duration: 0.25 }}
-                className="flex items-start gap-2 text-[13px]"
+                className="flex items-start gap-2 text-[14px]"
                 title={c.message}
               >
                 <span
@@ -409,7 +409,7 @@ function MatchingPreview() {
                 <span className="min-w-0">
                   <span className="text-graphite">{RULE_LABELS[c.rule]}</span>
                   <span className="sr-only">{c.passed ? ' passed' : ' failed'}</span>{' '}
-                  <span className="font-mono text-[11px] text-slate-600">{c.actual}</span>
+                  <span className="font-mono text-xs text-slate-600">{c.actual}</span>
                 </span>
               </motion.li>
             ))}
@@ -448,18 +448,18 @@ function ExchangePreview() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.15 + i * 0.18, duration: 0.35, ease: EASE_OUT }}
           >
-            <span className="absolute -left-8 top-0.5 flex size-6 items-center justify-center rounded-full border border-copper bg-cream-paper font-mono text-[10px] text-copper-700">
+            <span className="absolute -left-8 top-0.5 flex size-6 items-center justify-center rounded-full border border-copper bg-cream-paper font-mono text-xs text-copper-700">
               {i + 1}
             </span>
             <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
               <p className="font-medium text-graphite">{f.step}</p>
               <Tag>{f.who}</Tag>
             </div>
-            <p className="mt-1 max-w-lg text-[13px] leading-relaxed text-slate-700">{f.text}</p>
+            <p className="mt-1 max-w-lg text-[14px] leading-relaxed text-slate-700">{f.text}</p>
           </motion.li>
         ))}
       </ol>
-      <p className="border-t border-graphite/10 pt-4 text-[13px] text-slate-700">
+      <p className="border-t border-graphite/10 pt-4 text-[14px] text-slate-700">
         A supplier can decline; the buyer then cancels to release any stock others reserved. Cancelling never deducts inventory.
       </p>
     </div>

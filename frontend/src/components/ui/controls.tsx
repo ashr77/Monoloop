@@ -27,7 +27,7 @@ export function SearchInput({
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         aria-label={label}
-        className="h-8 w-full rounded-sm border border-graphite/15 bg-cream-paper pl-8 pr-8 text-[13px] text-graphite placeholder:text-slate-500 transition-[border-color,box-shadow] duration-fast hover:border-graphite/35 focus:border-copper focus:outline-none focus:ring-2 focus:ring-copper/20 [&::-webkit-search-cancel-button]:hidden"
+        className="h-8 w-full rounded-sm border border-graphite/15 bg-cream-paper pl-8 pr-8 text-[14px] text-graphite placeholder:text-slate-500 transition-[border-color,box-shadow] duration-fast hover:border-graphite/35 focus:border-copper focus:outline-none focus:ring-2 focus:ring-copper/20 [&::-webkit-search-cancel-button]:hidden"
       />
       {value && (
         <button
@@ -51,7 +51,7 @@ export const ToolbarSelect = forwardRef<
   return (
     <label
       className={cn(
-        'relative inline-flex h-8 min-w-0 max-w-full items-center gap-1.5 rounded-sm border bg-cream-paper pl-2.5 text-[13px] text-graphite transition-colors duration-fast focus-within:border-copper focus-within:ring-2 focus-within:ring-copper/20',
+        'relative inline-flex h-8 min-w-0 max-w-full items-center gap-1.5 rounded-sm border bg-cream-paper pl-2.5 text-[14px] text-graphite transition-colors duration-fast focus-within:border-copper focus-within:ring-2 focus-within:ring-copper/20',
         invalid ? 'border-brick-500 ring-2 ring-brick-500/20' : 'border-graphite/15 hover:border-graphite/35',
         className
       )}
@@ -82,7 +82,7 @@ export function NumberField({
   return (
     <label className={cn('block min-w-0', className)}>
       <span className="t-label">{label}</span>
-      <input type="number" inputMode="decimal" className="field mt-1 h-8 py-1 text-[13px]" {...props} />
+      <input type="number" inputMode="decimal" className="field mt-1 h-8 py-1 text-[14px]" {...props} />
     </label>
   );
 }

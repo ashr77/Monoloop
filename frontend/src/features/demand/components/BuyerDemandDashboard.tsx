@@ -178,7 +178,7 @@ export function BuyerDemandDashboard() {
           <>
             {identity.locked ? (
               identity.organization && (
-                <span className="inline-flex h-10 items-center gap-2 rounded-sm border border-graphite/15 px-3 text-[13px] font-medium text-graphite">
+                <span className="inline-flex h-10 items-center gap-2 rounded-sm border border-graphite/15 px-3 text-[14px] font-medium text-graphite">
                   <Building2 className="size-4 text-slate-500" aria-hidden /> {identity.organization.name}
                 </span>
               )
@@ -298,21 +298,69 @@ export function BuyerDemandDashboard() {
             }
           />
         ) : (
-          <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
-            <table className="w-full min-w-[52rem] border-collapse text-left">
+          <>
+          {/* Phones: one card per requirement instead of an 8-column table. */}
+          <ul className="divide-y divide-graphite/[0.08] border-y border-graphite/15 md:hidden">
+            {visible.map((requirement) => (
+              <li key={requirement.id} className="space-y-2 py-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-medium text-graphite">
+                      {SPEC_LABEL[requirement.material_specification] ?? requirement.material_specification}
+                      <span className="font-normal text-slate-600"> · {FAMILY_LABEL[requirement.material_family]}</span>
+                    </p>
+                    <p className="truncate text-sm text-copper-700">{orgName(requirement) || 'Unknown buyer'}</p>
+                  </div>
+                  <StatusBadge tone={STATUS_TONE[requirement.status] ?? 'neutral'}>{requirement.status.toLowerCase()}</StatusBadge>
+                </div>
+                <p className="font-mono text-sm text-graphite">
+                  {axisLabel(requirement, 'length')} × {axisLabel(requirement, 'width')}
+                  <span className="text-slate-600"> · {axisLabel(requirement, 'thickness')} mm</span>
+                </p>
+                <p className="text-sm text-slate-700">
+                  <span className="font-medium tabular-nums text-graphite">{num(requirement.required_quantity)}</span> pcs
+                  {requirement.maximum_budget_bdt !== null && requirement.maximum_budget_bdt !== undefined && (
+                    <> · up to {bdt(Number(requirement.maximum_budget_bdt))}</>
+                  )}
+                  {requirement.allow_split_suppliers && <> · multi-supplier</>}
+                </p>
+                <div className="flex items-center gap-2 pt-1">
+                  <Link
+                    href={`/matches/${requirement.id}`}
+                    className="inline-flex h-9 items-center gap-1.5 rounded-sm bg-graphite px-3 text-sm font-medium text-cream transition-colors hover:bg-graphite-700"
+                  >
+                    <Cpu className="size-4" aria-hidden />
+                    Find matches
+                  </Link>
+                  {requirement.status === 'OPEN' && (
+                    <button
+                      type="button"
+                      onClick={() => openEdit(requirement)}
+                      className="inline-flex h-9 items-center gap-1.5 rounded-sm px-3 text-sm text-slate-700 hover:bg-graphite/[0.06]"
+                    >
+                      <Edit3 className="size-4" aria-hidden />
+                      Edit
+                    </button>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+          <div className="-mx-4 hidden overflow-x-auto px-4 sm:mx-0 sm:px-0 md:block">
+            <table className="w-full border-collapse text-left lg:min-w-[52rem]">
               <thead>
                 <tr className="border-b border-graphite/15">
                   <th scope="col" className="w-8 pb-2" aria-label="Expand" />
                   <th scope="col" className="t-label pb-2 pr-4 font-medium">Material</th>
                   <th scope="col" className="t-label pb-2 pr-4 font-medium">L × W · thickness (mm)</th>
                   <th scope="col" className="t-label pb-2 pr-4 text-right font-medium">Quantity</th>
-                  <th scope="col" className="t-label pb-2 pr-4 text-right font-medium">Maximum budget</th>
+                  <th scope="col" className="t-label hidden pb-2 pr-4 text-right font-medium lg:table-cell">Maximum budget</th>
                   <th scope="col" className="t-label pb-2 pr-4 font-medium">Status</th>
-                  <th scope="col" className="t-label pb-2 pr-4 font-medium">Created</th>
+                  <th scope="col" className="t-label hidden pb-2 pr-4 font-medium lg:table-cell">Created</th>
                   <th scope="col" className="t-label pb-2 text-right font-medium">Actions</th>
                 </tr>
               </thead>
-              <tbody className="text-[13px] text-graphite">
+              <tbody className="text-[14px] text-graphite">
                 <AnimatePresence initial={false}>
                   {visible.map((requirement) => {
                     const open = expanded === requirement.id;
@@ -346,7 +394,7 @@ export function BuyerDemandDashboard() {
                             <span className="font-medium">{num(requirement.required_quantity)}</span> pcs
                             {requirement.allow_split_suppliers && <p className="text-xs text-slate-600">Multi-supplier allowed</p>}
                           </td>
-                          <td className="whitespace-nowrap py-3.5 pr-4 text-right align-top tabular-nums">
+                          <td className="hidden whitespace-nowrap py-3.5 pr-4 text-right align-top tabular-nums lg:table-cell">
                             {requirement.maximum_budget_bdt === null || requirement.maximum_budget_bdt === undefined ? (
                               <span className="text-slate-600">Not set</span>
                             ) : (
@@ -359,7 +407,7 @@ export function BuyerDemandDashboard() {
                               <p className="mt-1 text-xs text-copper-700">Exchange proposed</p>
                             )}
                           </td>
-                          <td className="whitespace-nowrap py-3.5 pr-4 align-top font-mono text-xs text-slate-600">
+                          <td className="hidden whitespace-nowrap py-3.5 pr-4 align-top font-mono text-xs text-slate-600 lg:table-cell">
                             {new Date(requirement.created_at).toLocaleDateString()}
                           </td>
                           <td className="py-3.5 align-top">
@@ -377,10 +425,12 @@ export function BuyerDemandDashboard() {
                               )}
                               <Link
                                 href={`/matches/${requirement.id}`}
-                                className="inline-flex h-7 items-center gap-1.5 rounded-sm bg-graphite px-2.5 text-xs font-medium text-cream transition-colors hover:bg-graphite-700"
+                                aria-label="Find matches"
+                                title="Find matches"
+                                className="inline-flex h-7 items-center gap-1.5 whitespace-nowrap rounded-sm bg-graphite px-2.5 text-xs font-medium text-cream transition-colors hover:bg-graphite-700"
                               >
                                 <Cpu className="size-3.5" aria-hidden />
-                                Find matches
+                                <span className="hidden lg:inline">Find matches</span>
                               </Link>
                             </div>
                           </td>
@@ -390,7 +440,7 @@ export function BuyerDemandDashboard() {
                             <td />
                             <td colSpan={7} className="pb-5 pr-4">
                               <Collapse open={open}>
-                                <dl className="grid grid-cols-2 gap-x-6 gap-y-3 pt-1 text-[13px] md:grid-cols-4">
+                                <dl className="grid grid-cols-2 gap-x-6 gap-y-3 pt-1 text-[14px] md:grid-cols-4">
                                   {(['length', 'width', 'thickness'] as const).map((axis) => (
                                     <div key={axis}>
                                       <dt className="t-label">{axis}</dt>
@@ -431,6 +481,7 @@ export function BuyerDemandDashboard() {
               </tbody>
             </table>
           </div>
+          </>
         )}
         {!loading && !loadError && <LoadMore shown={shown} total={total} onMore={more} noun="requirements" />}
       </section>
@@ -508,16 +559,16 @@ function Recommendations({
             return (
               <div className="space-y-5">
                 <div className="flex flex-wrap gap-2">
-                  <StatusBadge tone={fulfilment.tone} solid>
+                  <StatusBadge tone={fulfilment.tone}>
                     {fulfilment.text}
                   </StatusBadge>
                   {result.budget.status === 'OVER_BUDGET' && (
-                    <StatusBadge tone="warning" solid>
+                    <StatusBadge tone="warning">
                       Over budget
                     </StatusBadge>
                   )}
                   {result.budget.status === 'WITHIN_BUDGET' && (
-                    <StatusBadge tone="success" solid>
+                    <StatusBadge tone="success">
                       Within budget
                     </StatusBadge>
                   )}
@@ -552,7 +603,7 @@ function Recommendations({
                                 : 'Technically compatible; not selected in the cheapest allocation'}
                             </p>
                           </div>
-                          <dl className="grid grid-cols-3 gap-3 text-[13px] md:col-span-8 lg:grid-cols-6">
+                          <dl className="grid grid-cols-3 gap-3 text-[14px] md:col-span-8 lg:grid-cols-6">
                             <Fact label="Available" value={`${evaluation.available_quantity} pcs`} />
                             <Fact label="Unit price" value={bdt(evaluation.unit_price_bdt)} />
                             {allocation && (
@@ -578,8 +629,8 @@ function Recommendations({
                 {result.compatibility_explanations.length > 0 && (
                   <ol className="space-y-1.5">
                     {result.compatibility_explanations.map((line, index) => (
-                      <li key={`${line}-${index}`} className="flex gap-3 text-[13px] text-slate-700">
-                        <span className="font-mono text-[11px] text-copper-700">{String(index + 1).padStart(2, '0')}</span>
+                      <li key={`${line}-${index}`} className="flex gap-3 text-[14px] text-slate-700">
+                        <span className="font-mono text-xs text-copper-700">{String(index + 1).padStart(2, '0')}</span>
                         {line}
                       </li>
                     ))}
@@ -594,7 +645,7 @@ function Recommendations({
                       <RequestExchangeButton
                         requirementId={requirementId}
                         buyerOrganizationId={organizationId}
-                        className="inline-flex h-8 items-center gap-2 rounded-sm bg-copper-600 px-3 text-[13px] font-medium text-white hover:bg-copper-700 disabled:opacity-60"
+                        className="inline-flex h-8 items-center gap-2 rounded-sm bg-copper-600 px-3 text-[14px] font-medium text-white hover:bg-copper-700 disabled:opacity-60"
                       />
                     )}
                   </div>

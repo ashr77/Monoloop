@@ -19,11 +19,11 @@ const TONE: Record<NonNullable<Metric['tone']>, string> = {
 
 /**
  * A row of figures divided by vertical hairlines — replaces rows of KPI cards.
- * Wraps to two columns on small screens.
+ * Two columns below 1024px (labels stay readable), one row above.
  */
 export function MetricStrip({ metrics, className }: { metrics: Metric[]; className?: string }) {
   return (
-    <dl className={cn('grid grid-cols-2 border-y rule sm:flex', className)}>
+    <dl className={cn('grid grid-cols-2 border-y rule lg:flex', className)}>
       {metrics.map((m, i) => (
         <div
           key={m.label}
@@ -33,7 +33,7 @@ export function MetricStrip({ metrics, className }: { metrics: Metric[]; classNa
             i % 2 === 1 && 'border-l pl-4',
             i > 1 && 'border-t',
             // desktop: one row, hairline between every figure
-            'sm:border-t-0 sm:px-6 sm:[&:not(:first-child)]:border-l sm:first:pl-0'
+            'lg:border-t-0 lg:px-6 lg:[&:not(:first-child)]:border-l lg:first:pl-0'
           )}
         >
           <dt className="t-label truncate">{m.label}</dt>
