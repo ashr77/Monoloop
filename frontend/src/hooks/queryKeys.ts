@@ -21,6 +21,7 @@ export const queryKeys = {
     list: (f: ExchangeFilters) => ['exchanges', 'list', f] as const,
   },
   impact: (organizationId: string | null) => ['impact', organizationId] as const,
+  notifications: (organizationId: string) => ['notifications', organizationId] as const,
   chat: {
     all: ['chat'] as const,
     inbox: (organizationId: string) => ['chat', 'inbox', organizationId] as const,

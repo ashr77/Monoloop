@@ -245,3 +245,15 @@ class MemoryChatRepository:
     async def mark_read(self, conversation_id: str, actor_id: str) -> None:
         async with self.s.lock:
             chat.mark_read(self.s, conversation_id, actor_id)
+
+
+class MemoryNotificationReadRepository:
+    def __init__(self, store: InMemoryStore):
+        self.s = store
+
+    async def read_ids(self, organization_id: str, notification_ids: list[str]) -> set[str]:
+        return {n for n in notification_ids if (organization_id, n) in self.s.notification_reads}
+
+    async def mark_read(self, organization_id: str, notification_ids: list[str]) -> None:
+        async with self.s.lock:
+            self.s.notification_reads.update((organization_id, n) for n in notification_ids)

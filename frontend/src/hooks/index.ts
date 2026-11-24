@@ -18,4 +18,5 @@ export type { VoiceInputMode, VoiceInputStatus } from './useVoiceInput';
 export { useExtractRequirement } from './useExtractRequirement';
 export { useOpenConversation, useInbox, useConversationThread, CHAT_POLL_MS } from './useChat';
 export { useChatIdentity } from './useChatIdentity';
+export { useNotifications, useMarkNotificationsRead, NOTIFICATIONS_POLL_MS } from './useNotifications';
 export { queryKeys } from './queryKeys';

@@ -8,6 +8,7 @@ import type { MatchResult } from '@/features/matching/types';
 import type { ExchangeAction, ExchangeView, PaymentStart } from '@/features/exchanges/types';
 import type { ImpactReport } from '@/features/analytics/impact';
 import type { ConversationSummary, ConversationView } from '@/features/chat/types';
+import type { AppNotification, NotificationFeed } from '@/features/notifications/types';
 import type { MaterialExtractionResult, RequirementExtractionResult, SpeechLanguage } from '@/lib/ai/schemas';
 import type { AuthSession, CompanyRecord, Profile } from '@/lib/auth/session';
 import { apiRequest } from './client';
@@ -208,6 +209,19 @@ export const api = {
   },
 
   /** Buyer ↔ supplier chat about a listing (participants only). */
+  notifications: {
+    /** Order and payment events on the acting organization's exchanges, newest first. */
+    list: (organizationId: string, signal?: AbortSignal): Promise<NotificationFeed> =>
+      apiRequest<AppNotification[]>('/api/notifications', { organizationId, signal }).then((r) => ({
+        items: r.data,
+        unreadTotal: Number((r.meta as { unread_total?: number } | undefined)?.unread_total ?? 0),
+      })),
+    markRead: (body: { ids?: string[]; all?: boolean }, organizationId: string) =>
+      apiRequest<{ unread_total: number }>('/api/notifications/read', { method: 'POST', body, organizationId }).then(
+        (r) => r.data
+      ),
+  },
+
   chat: {
     list: (organizationId: string, signal?: AbortSignal) =>
       apiRequest<ConversationSummary[]>('/api/conversations', { organizationId, signal }).then((r) => ({

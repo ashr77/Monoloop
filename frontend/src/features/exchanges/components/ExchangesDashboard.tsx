@@ -126,10 +126,20 @@ export function ExchangesDashboard() {
     router.replace(`/exchanges${params.size ? `?${params}` : ''}`, { scroll: false });
   }, [paymentReturn, searchParams, router]);
 
-  // When arriving from "Request exchange", show the new request even if the filter would hide it.
+  // Arriving from "Request exchange" or a notification: switch to the filter that contains the
+  // highlighted exchange (completed and cancelled ones are not under "Active").
+  const highlightedStage = highlight ? exchanges.find((e) => e.id === highlight)?.stage : undefined;
   useEffect(() => {
-    if (highlight) setFilter('ACTIVE');
-  }, [highlight, setFilter]);
+    if (!highlight) return;
+    if (!highlightedStage) {
+      setFilter('ACTIVE');
+      return;
+    }
+    const current = FILTERS.find((f) => f.id === filter);
+    if (current?.stages.includes(highlightedStage)) return;
+    setFilter(FILTERS.find((f) => f.id !== 'ALL' && f.stages.includes(highlightedStage))?.id ?? 'ALL');
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- react to a new highlight / its data, not to filter clicks
+  }, [highlight, highlightedStage, setFilter]);
 
   // Organizations known to the API plus any that appear in exchanges.
   const orgOptions = useMemo(() => {

@@ -21,6 +21,7 @@ from app.repositories.memory.repositories import (
     MemoryChatRepository,
     MemoryExchangeRepository,
     MemoryListingRepository,
+    MemoryNotificationReadRepository,
     MemoryOrganizationRepository,
     MemoryRequirementRepository,
 )
@@ -34,6 +35,7 @@ from app.services.demand import RequirementService
 from app.services.exchange import ExchangeService
 from app.services.impact import ImpactService
 from app.services.matching.service import MatchingService
+from app.services.notifications import NotificationService
 from app.services.payments.gateway import PaymentGateway, SSLCommerzGateway
 from app.services.payments.service import PaymentService
 from app.services.storage import ImageUploadService, build_image_store
@@ -58,6 +60,7 @@ class Container:
         self.exchanges = ExchangeService(self.repos, self.matching, self.payments)
         self.impact = ImpactService(self.repos)
         self.chat = ChatService(self.repos)
+        self.notifications = NotificationService(self.repos, self.exchanges)
         self.extraction = ExtractionService(self.settings, self.http)
         self.auth = AuthService(self.repos, build_auth_provider(self.settings, self.http))
         self.transcription = TranscriptionService(self.settings, self.http)
@@ -97,6 +100,7 @@ def memory_repositories(store: InMemoryStore) -> Repositories:
         chat=MemoryChatRepository(store),
         backend="memory",
         payments=MemoryPaymentRepository(store),
+        notifications=MemoryNotificationReadRepository(store),
     )
 
 
@@ -106,6 +110,7 @@ def postgres_repositories(engine: AsyncEngine) -> Repositories:
         PgChatRepository,
         PgExchangeRepository,
         PgListingRepository,
+        PgNotificationReadRepository,
         PgOrganizationRepository,
         PgRequirementRepository,
     )
@@ -118,6 +123,7 @@ def postgres_repositories(engine: AsyncEngine) -> Repositories:
         chat=PgChatRepository(engine),
         backend="postgres",
         payments=PgPaymentRepository(engine),
+        notifications=PgNotificationReadRepository(engine),
     )
 
 
@@ -127,6 +133,7 @@ def supabase_repositories(rest: httpx.AsyncClient) -> Repositories:
         SupabaseChatRepository,
         SupabaseExchangeRepository,
         SupabaseListingRepository,
+        SupabaseNotificationReadRepository,
         SupabaseOrganizationRepository,
         SupabaseRequirementRepository,
     )
@@ -139,6 +146,7 @@ def supabase_repositories(rest: httpx.AsyncClient) -> Repositories:
         chat=SupabaseChatRepository(rest),
         backend="supabase",
         payments=SupabasePaymentRepository(rest),
+        notifications=SupabaseNotificationReadRepository(rest),
     )
 
 

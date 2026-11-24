@@ -442,3 +442,35 @@ class PgChatRepository:
         self._require_uuid(conversation_id, "Conversation")
         await self._call("SELECT mark_listing_conversation_read(CAST(:c AS uuid), CAST(:a AS uuid))",
                          {"c": conversation_id, "a": actor_id})
+
+
+class PgNotificationReadRepository:
+    """Notification read state (migration 00010)."""
+
+    def __init__(self, engine: AsyncEngine):
+        self.engine = engine
+
+    async def read_ids(self, organization_id: str, notification_ids: list[str]) -> set[str]:
+        if not notification_ids or not is_uuid(organization_id):
+            return set()
+        try:
+            async with self.engine.connect() as conn:
+                rows = await conn.execute(text(
+                    "SELECT notification_id FROM notification_reads "
+                    "WHERE organization_id = CAST(:o AS uuid) AND notification_id = ANY(:ids)"
+                ), {"o": organization_id, "ids": notification_ids})
+                return {r[0] for r in rows}
+        except DBAPIError as exc:
+            raise translate_db_error(exc) from exc
+
+    async def mark_read(self, organization_id: str, notification_ids: list[str]) -> None:
+        if not notification_ids or not is_uuid(organization_id):
+            return
+        try:
+            async with self.engine.begin() as conn:
+                await conn.execute(text(
+                    "INSERT INTO notification_reads (organization_id, notification_id) "
+                    "SELECT CAST(:o AS uuid), unnest(CAST(:ids AS text[])) ON CONFLICT DO NOTHING"
+                ), {"o": organization_id, "ids": notification_ids})
+        except DBAPIError as exc:
+            raise translate_db_error(exc) from exc
