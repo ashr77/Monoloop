@@ -49,6 +49,8 @@ class InMemoryStore:
         self.conversations: dict[str, ConversationRecord] = {}
         self.chat_messages: list[ChatMessage] = []
         self.chat_seq = 0
+        # Notification read state (migration 00010): (organization_id, notification_id)
+        self.notification_reads: set[tuple[str, str]] = set()
 
     # Read helpers return copies so callers can never mutate the store through a result.
     def listing_view(self, listing: Listing) -> Listing:

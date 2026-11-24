@@ -15,7 +15,18 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.api.deps import build_container
-from app.api.routes import admin, auth, chat, demand, exchange, matching, payment, supply, system
+from app.api.routes import (
+    admin,
+    auth,
+    chat,
+    demand,
+    exchange,
+    matching,
+    notifications,
+    payment,
+    supply,
+    system,
+)
 from app.core.config import Settings, get_settings
 from app.core.errors import register_exception_handlers
 from app.core.middleware import (
@@ -60,7 +71,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         openapi_url=None if is_prod else "/openapi.json",
     )
     register_exception_handlers(app)
-    for module in (system, auth, admin, supply, demand, matching, exchange, payment, chat):
+    for module in (system, auth, admin, supply, demand, matching, exchange, payment, chat, notifications):
         app.include_router(module.router)
     # Listing photos saved on local disk (offline demo; Supabase Storage serves its own files).
     upload_root = Path(settings.upload_dir)

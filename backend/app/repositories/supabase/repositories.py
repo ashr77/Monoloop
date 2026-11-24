@@ -455,3 +455,31 @@ class SupabaseChatRepository:
     async def mark_read(self, conversation_id: str, actor_id: str) -> None:
         self._require_uuid(conversation_id, "Conversation")
         await self.rest.rpc("mark_listing_conversation_read", {"p_conversation_id": conversation_id, "p_actor_id": actor_id})
+
+
+class SupabaseNotificationReadRepository:
+    """Notification read state over PostgREST (migration 00010)."""
+
+    def __init__(self, client: httpx.AsyncClient):
+        self.rest = _Rest(client)
+
+    async def read_ids(self, organization_id: str, notification_ids: list[str]) -> set[str]:
+        if not notification_ids or not is_uuid(organization_id):
+            return set()
+        # Ids are UUIDs or 'payment:<tran_id>' (letters, digits, '-', '_', ':'), quoted for the in() filter.
+        quoted = [f'"{n}"' for n in notification_ids]
+        rows = await self.rest.get("notification_reads", {
+            "select": "notification_id", "organization_id": f"eq.{organization_id}",
+            "notification_id": _in(quoted),
+        })
+        return {r["notification_id"] for r in rows}
+
+    async def mark_read(self, organization_id: str, notification_ids: list[str]) -> None:
+        if not notification_ids or not is_uuid(organization_id):
+            return
+        await self.rest._send(
+            "POST", "/notification_reads",
+            params={"on_conflict": "organization_id,notification_id"},
+            json=[{"organization_id": organization_id, "notification_id": n} for n in notification_ids],
+            headers={"Prefer": "resolution=ignore-duplicates,return=minimal"},
+        )

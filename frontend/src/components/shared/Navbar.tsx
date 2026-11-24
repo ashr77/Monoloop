@@ -34,6 +34,7 @@ import { Suspense, useCallback, useEffect, useRef, useState, type ComponentType,
 import { EASE_OUT, transition } from '@/components/motion';
 import { Menu, MenuItem, MenuLabel, MenuSeparator, StatusBadge } from '@/components/ui';
 import { UnreadBadge } from '@/features/chat/components/UnreadBadge';
+import { NotificationBell } from '@/features/notifications/NotificationBell';
 import { useAuth } from '@/lib/auth/AuthProvider';
 import { cn } from '@/lib/utils';
 import { Wordmark } from './Wordmark';
@@ -178,6 +179,8 @@ function NavbarInner() {
               </StatusBadge>
             </span>
           )}
+
+          {canBrowse && <NotificationBell />}
 
           {canBrowse && (
             <Link
