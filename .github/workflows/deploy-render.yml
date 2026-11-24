@@ -1,0 +1,113 @@
+# Deploy to Render on every push to main.
+#
+# Render cannot auto-deploy this repo (the services read it as a public Git URL), so this
+# workflow calls Render's deploy hooks instead. Only the part that changed is deployed:
+#   backend/ or render.yaml  -> monoloop-api   (then waits until /api/health reports this commit)
+#   frontend/ or render.yaml -> monoloop-web   (then waits until the site answers)
+#
+# One-time setup by a repo admin: Settings -> Secrets and variables -> Actions -> New secret
+#   RENDER_DEPLOY_HOOK_API = Render -> monoloop-api -> Settings -> Deploy Hook URL
+#   RENDER_DEPLOY_HOOK_WEB = Render -> monoloop-web -> Settings -> Deploy Hook URL
+# Without the secrets the workflow only prints a warning. Manual run: Actions -> Deploy to Render.
+
+name: Deploy to Render
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      target:
+        description: What to deploy
+        type: choice
+        options: [both, backend, frontend]
+        default: both
+
+concurrency:
+  group: render-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  API_URL: https://monoloop-api.onrender.com
+  WEB_URL: https://monoloop-web.onrender.com
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: What changed
+        id: changes
+        env:
+          EVENT: ${{ github.event_name }}
+          TARGET: ${{ inputs.target }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          backend=false; frontend=false
+          if [ "$EVENT" = "workflow_dispatch" ]; then
+            [ "$TARGET" != "frontend" ] && backend=true
+            [ "$TARGET" != "backend" ] && frontend=true
+          elif [ -z "$BEFORE" ] || [ "$BEFORE" = "0000000000000000000000000000000000000000" ] \
+               || ! git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+            backend=true; frontend=true
+          else
+            files=$(git diff --name-only "$BEFORE" "$GITHUB_SHA")
+            echo "Changed files:"; echo "$files"
+            echo "$files" | grep -qE '^(backend/|render\.yaml$)' && backend=true
+            echo "$files" | grep -qE '^(frontend/|render\.yaml$)' && frontend=true
+          fi
+          echo "backend=$backend" >> "$GITHUB_OUTPUT"
+          echo "frontend=$frontend" >> "$GITHUB_OUTPUT"
+          echo "Deploy backend: $backend, frontend: $frontend"
+
+      - name: Deploy backend (monoloop-api)
+        id: api
+        if: steps.changes.outputs.backend == 'true'
+        env:
+          HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_API }}
+        run: |
+          if [ -z "$HOOK" ]; then echo "::warning::RENDER_DEPLOY_HOOK_API secret is not set; backend not deployed."; exit 0; fi
+          code=$(curl -s -o /dev/null -w '%{http_code}' -X POST "${HOOK}&ref=${GITHUB_SHA}")
+          echo "Render answered HTTP $code"
+          case "$code" in 200|202) echo "triggered=true" >> "$GITHUB_OUTPUT" ;; *) exit 1 ;; esac
+
+      - name: Deploy frontend (monoloop-web)
+        id: web
+        if: steps.changes.outputs.frontend == 'true'
+        env:
+          HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_WEB }}
+        run: |
+          if [ -z "$HOOK" ]; then echo "::warning::RENDER_DEPLOY_HOOK_WEB secret is not set; frontend not deployed."; exit 0; fi
+          code=$(curl -s -o /dev/null -w '%{http_code}' -X POST "${HOOK}&ref=${GITHUB_SHA}")
+          echo "Render answered HTTP $code"
+          case "$code" in 200|202) echo "triggered=true" >> "$GITHUB_OUTPUT" ;; *) exit 1 ;; esac
+
+      - name: Wait until the backend runs this commit
+        if: steps.api.outputs.triggered == 'true'
+        run: |
+          for i in $(seq 1 60); do
+            live=$(curl -s -m 60 "$API_URL/api/health" | python3 -c 'import sys,json; print((json.load(sys.stdin).get("data") or {}).get("commit") or "")' 2>/dev/null || true)
+            if [ "$live" = "$GITHUB_SHA" ]; then echo "Backend is live on ${GITHUB_SHA::7}"; exit 0; fi
+            echo "Waiting... live commit: ${live:-unknown}"; sleep 20
+          done
+          echo "::error::Backend did not come up on ${GITHUB_SHA::7} within 20 minutes. Check the Render deploy log."
+          exit 1
+
+      - name: Wait until the frontend answers
+        if: steps.web.outputs.triggered == 'true'
+        run: |
+          sleep 90  # let Render start the new build before checking
+          for i in $(seq 1 45); do
+            code=$(curl -s -m 60 -o /dev/null -w '%{http_code}' "$WEB_URL/login" || true)
+            if [ "$code" = "200" ]; then echo "Frontend is up"; exit 0; fi
+            echo "Waiting... HTTP $code"; sleep 20
+          done
+          echo "::error::Frontend did not answer within 15 minutes. Check the Render deploy log."
+          exit 1
