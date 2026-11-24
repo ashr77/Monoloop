@@ -15,7 +15,15 @@ from fastapi import Request
 
 from app.core.errors import AppError
 from app.repositories.base import Repositories
-from app.schemas.auth import Profile, ResubmitRequest, Session, SignupRequest
+from app.schemas.auth import (
+    PasswordChange,
+    Profile,
+    ProfileUpdate,
+    ProfileUpdateResult,
+    ResubmitRequest,
+    Session,
+    SignupRequest,
+)
 from app.schemas.entities import OrganizationRecord
 from app.services.auth.provider import AuthProvider, Identity
 
@@ -95,6 +103,39 @@ class AuthService:
             changes["name"] = changes.pop("company_name")
         await self.repos.organizations.update(org.id, {**changes, "status": "PENDING", "rejection_reason": None})
         return await self.profile(identity)
+
+    async def update_profile(self, identity: Identity, req: ProfileUpdate) -> ProfileUpdateResult:
+        """Address/city apply immediately. A new company name or licence number sends the company
+        back to PENDING: otherwise an approved account could turn into a different company."""
+        org = await self._own(identity)
+        changes: dict = {}
+        if req.company_name is not None and req.company_name != org.name:
+            changes["name"] = req.company_name
+        if req.license_number is not None and req.license_number.lower() != (org.license_number or "").lower():
+            if await self.repos.organizations.find_conflict("-", req.license_number) == "license":
+                raise AppError("LICENSE_TAKEN", "A company with this licence number is already registered.")
+            changes["license_number"] = req.license_number
+        if req.city is not None and req.city != org.city:
+            changes["city"] = req.city
+        if req.address is not None and (req.address or None) != org.address:
+            changes["address"] = req.address or None
+        reapproval = bool({"name", "license_number"} & changes.keys()) and org.status != "SUSPENDED"
+        if reapproval:
+            changes |= {"status": "PENDING", "rejection_reason": None, "reviewed_at": None}
+        if changes:
+            await self.repos.organizations.update(org.id, changes)
+        return ProfileUpdateResult(profile=await self.profile(identity), reapproval_required=reapproval)
+
+    async def change_password(self, identity: Identity, req: PasswordChange) -> None:
+        try:
+            await self.provider.sign_in(identity.email, req.current_password)
+        except AppError as exc:
+            if exc.code == "INVALID_CREDENTIALS":
+                raise AppError("WRONG_PASSWORD", "Your current password is incorrect.") from exc
+            raise
+        if req.new_password == req.current_password:
+            raise AppError("VALIDATION_ERROR", "Choose a password different from the current one.")
+        await self.provider.set_password(identity.user_id, req.new_password)
 
     async def _own(self, identity: Identity) -> OrganizationRecord:
         org = await self.repos.organizations.get_record(identity.organization_id or "")

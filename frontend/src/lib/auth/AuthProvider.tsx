@@ -49,10 +49,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    api.health
-      .get()
-      .then((h) => setMode(h.auth_mode === 'jwt' ? 'jwt' : 'demo'))
-      .catch(() => setMode('demo')); // backend unreachable: pages show their own errors
+    let cancelled = false;
+    (async () => {
+      // The backend decides the mode. Retry a few times (cold starts, flaky networks) and never
+      // drop a signed-in user into demo mode just because the backend was slow to answer.
+      for (let attempt = 0; attempt < 3 && !cancelled; attempt++) {
+        try {
+          const h = await api.health.get();
+          if (!cancelled) setMode(h.auth_mode === 'jwt' ? 'jwt' : 'demo');
+          return;
+        } catch {
+          await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
+        }
+      }
+      if (!cancelled) setMode(getSession() ? 'jwt' : 'demo'); // unreachable: pages show their own errors
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const reloadProfile = useCallback(async () => {
@@ -156,8 +170,11 @@ function AuthGate({ children }: { children: ReactNode }) {
 
   if (mode === 'loading' || !ok) {
     return (
-      <div className="flex min-h-[50vh] items-center justify-center text-slate-500">
-        <Loader2 className="mr-2 h-5 w-5 animate-spin text-emerald-600" /> Loading…
+      <div className="flex min-h-[50vh] flex-col items-center justify-center gap-2 text-slate-500">
+        <span className="flex items-center">
+          <Loader2 className="mr-2 h-5 w-5 animate-spin text-emerald-600" /> Loading…
+        </span>
+        {mode === 'loading' && <span className="text-xs text-slate-400">Waking up the server, this can take up to a minute.</span>}
       </div>
     );
   }

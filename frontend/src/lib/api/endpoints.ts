@@ -152,9 +152,10 @@ export const api = {
 
   health: {
     get: () =>
-      apiRequest<{ status: string; auth_mode?: 'demo' | 'jwt'; payment_configured?: boolean }>('/api/health').then(
-        (r) => r.data
-      ),
+      // Long timeout: a sleeping free-tier backend can take ~50 s to wake up.
+      apiRequest<{ status: string; auth_mode?: 'demo' | 'jwt'; payment_configured?: boolean }>('/api/health', {
+        timeoutMs: 75_000,
+      }).then((r) => r.data),
   },
 
   auth: {
@@ -163,6 +164,15 @@ export const api = {
     login: (email: string, password: string) =>
       apiRequest<AuthSession>('/api/auth/login', { method: 'POST', body: { email, password } }).then((r) => r.data),
     me: () => apiRequest<Profile>('/api/auth/me').then((r) => r.data),
+    updateProfile: (body: Partial<Omit<SignupInput, 'email' | 'password'>>) =>
+      apiRequest<{ profile: Profile; reapproval_required: boolean }>('/api/auth/profile', { method: 'PATCH', body }).then(
+        (r) => r.data
+      ),
+    changePassword: (current_password: string, new_password: string) =>
+      apiRequest<{ changed: boolean }>('/api/auth/password', {
+        method: 'POST',
+        body: { current_password, new_password },
+      }).then((r) => r.data),
     resubmit: (body: Partial<Omit<SignupInput, 'email' | 'password'>>) =>
       apiRequest<Profile>('/api/auth/application', { method: 'PATCH', body }).then((r) => r.data),
   },

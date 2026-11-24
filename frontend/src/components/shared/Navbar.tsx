@@ -90,17 +90,17 @@ export function Navbar() {
           {mode === 'jwt' ? (
             signedIn ? (
               <div className="flex items-center gap-2">
-                <span className={`${profile?.role === 'admin' ? 'hidden' : 'hidden lg:inline-flex'} items-center gap-1.5 max-w-[14rem] truncate px-3 py-1 bg-slate-100 border border-slate-200 rounded-full text-xs font-semibold text-slate-700`}>
+                <Link href="/account" title="My account" className={`${profile?.role === 'admin' ? 'inline-flex' : 'hidden lg:inline-flex'} items-center gap-1.5 max-w-[9rem] truncate px-3 py-1 bg-slate-100 border border-slate-200 rounded-full text-xs font-semibold text-slate-700 hover:border-emerald-300 hover:text-emerald-800`}>
                   {profile?.role === 'admin' ? <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" /> : <Building2 className="w-3.5 h-3.5 text-slate-500" />}
-                  {profile?.role === 'admin' ? 'Admin' : profile?.organization?.name}
-                </span>
+                  {profile?.role === 'admin' ? <span className="sr-only">My account</span> : profile?.organization?.name}
+                </Link>
                 <button
                   onClick={signOut}
                   className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"
                   title="Sign out"
                   aria-label="Sign out"
                 >
-                  <LogOut className="w-3.5 h-3.5" /> <span className="hidden xl:inline">Sign out</span>
+                  <LogOut className="w-3.5 h-3.5" /> <span className="hidden 2xl:inline">Sign out</span>
                 </button>
               </div>
             ) : (

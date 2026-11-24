@@ -54,6 +54,7 @@ class AuthProvider(Protocol):
     async def sign_in(self, email: str, password: str) -> Tokens: ...
     async def refresh(self, refresh_token: str) -> Tokens: ...
     async def verify(self, access_token: str) -> Identity: ...
+    async def set_password(self, user_id: str, password: str) -> None: ...
 
 
 # ---------------------------------------------------------------------------- Supabase
@@ -131,6 +132,17 @@ class SupabaseAuthProvider:
             raise AppError("UNAUTHORIZED", "Invalid or expired session. Please sign in again.") from exc
         return identity_from_claims(claims)
 
+    async def set_password(self, user_id: str, password: str) -> None:
+        try:
+            r = await self.http.put(f"{self.base}/admin/users/{user_id}", json={"password": password},
+                                    headers=self._headers(), timeout=15)
+        except httpx.HTTPError as exc:
+            raise AppError("SERVICE_UNAVAILABLE", f"Login service is unreachable ({type(exc).__name__}).") from exc
+        if r.status_code == 422:
+            raise AppError("VALIDATION_ERROR", "The login service rejected this password; choose a stronger one.")
+        if r.status_code >= 400:
+            raise AppError("SERVICE_UNAVAILABLE", f"Could not change the password (login service HTTP {r.status_code}).")
+
     async def set_app_metadata(self, user_id: str, app_metadata: dict) -> None:
         r = await self.http.put(f"{self.base}/admin/users/{user_id}", json={"app_metadata": app_metadata},
                                 headers=self._headers(), timeout=15)
@@ -198,6 +210,12 @@ class LocalAuthProvider:
         except jwt.PyJWTError as exc:
             raise AppError("UNAUTHORIZED", "Invalid or expired session. Please sign in again.") from exc
         return identity_from_claims(claims)
+
+    async def set_password(self, user_id: str, password: str) -> None:
+        for u in self.users.values():
+            if u["id"] == user_id:
+                u["salt"] = secrets.token_hex(8)
+                u["hash"] = self._hash(password, u["salt"])
 
     async def set_app_metadata(self, user_id: str, app_metadata: dict) -> None:
         for u in self.users.values():

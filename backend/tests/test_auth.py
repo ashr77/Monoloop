@@ -201,3 +201,67 @@ async def test_every_company_with_a_login_can_buy_and_sell(jwt_client):
     # ...and the former supplier chats with it as a buyer.
     r = await jwt_client.post("/api/conversations", json={"listing_id": listing_id}, headers=bearer(gazipur))
     assert r.status_code == 201, r.text
+
+
+async def approved_company(c) -> dict:
+    s = await signup(c)
+    admin = await admin_session(c)
+    await c.post(f"/api/admin/organizations/{s['profile']['organization']['id']}/approve", headers=bearer(admin))
+    return s
+
+
+async def test_profile_address_and_city_change_immediately(jwt_client):
+    s = await approved_company(jwt_client)
+    r = await jwt_client.patch("/api/auth/profile", json={"city": "Khulna", "address": "Rupsha Ghat 3"}, headers=bearer(s))
+    data = r.json()["data"]
+    assert data["reapproval_required"] is False
+    org = data["profile"]["organization"]
+    assert (org["city"], org["address"], org["status"]) == ("Khulna", "Rupsha Ghat 3", "APPROVED")
+
+
+@pytest.mark.parametrize("change", [{"company_name": "Totally Different Ltd"}, {"license_number": "TRAD/CTG/2026/9999"}])
+async def test_new_name_or_license_needs_reapproval(jwt_client, change):
+    s = await approved_company(jwt_client)
+    r = await jwt_client.patch("/api/auth/profile", json=change, headers=bearer(s))
+    data = r.json()["data"]
+    assert data["reapproval_required"] is True and data["profile"]["organization"]["status"] == "PENDING"
+    # Trading stops until an admin approves again.
+    r = await jwt_client.post("/api/listings", json=listing_for(data["profile"]["organization"]["id"]), headers=bearer(s))
+    assert r.json()["error"]["code"] == "ACCOUNT_PENDING"
+
+
+async def test_unchanged_name_does_not_trigger_reapproval(jwt_client):
+    s = await approved_company(jwt_client)
+    r = await jwt_client.patch("/api/auth/profile", headers=bearer(s),
+                               json={"company_name": COMPANY["company_name"], "license_number": "trad/ctg/2026/0042"})
+    assert r.json()["data"]["reapproval_required"] is False
+
+
+async def test_profile_license_must_stay_unique(jwt_client):
+    s = await approved_company(jwt_client)
+    await signup(jwt_client, email="other@x.example", license_number="OTHER-777")
+    r = await jwt_client.patch("/api/auth/profile", json={"license_number": "other-777"}, headers=bearer(s))
+    assert r.status_code == 409 and r.json()["error"]["code"] == "LICENSE_TAKEN"
+
+
+async def test_change_password(jwt_client):
+    s = await approved_company(jwt_client)
+    bad = await jwt_client.post("/api/auth/password", json={"current_password": "nope-nope", "new_password": "brand-new-1"},
+                                headers=bearer(s))
+    assert bad.status_code == 400 and bad.json()["error"]["code"] == "WRONG_PASSWORD"
+    short = await jwt_client.post("/api/auth/password", json={"current_password": COMPANY["password"], "new_password": "x"},
+                                  headers=bearer(s))
+    assert short.status_code == 400
+    ok_ = await jwt_client.post("/api/auth/password", json={"current_password": COMPANY["password"],
+                                                            "new_password": "brand-new-1"}, headers=bearer(s))
+    assert ok_.status_code == 200
+    login = lambda pw: jwt_client.post("/api/auth/login", json={"email": COMPANY["email"], "password": pw})  # noqa: E731
+    assert (await login(COMPANY["password"])).status_code == 401
+    assert (await login("brand-new-1")).status_code == 200
+
+
+async def test_admin_can_change_own_password(jwt_client):
+    admin = await admin_session(jwt_client)
+    r = await jwt_client.post("/api/auth/password", json={"current_password": "admin-pass-1", "new_password": "admin-pass-2"},
+                              headers=bearer(admin))
+    assert r.status_code == 200

@@ -53,6 +53,25 @@ class ResubmitRequest(_Strict):
     license_number: License | None = None
 
 
+class ProfileUpdate(_Strict):
+    """Company details. Address and city apply at once; a new name or licence needs re-approval."""
+
+    company_name: Name | None = None
+    city: City | None = None
+    address: Annotated[str, StringConstraints(strip_whitespace=True, max_length=200)] | None = None
+    license_number: License | None = None
+
+
+class PasswordChange(_Strict):
+    current_password: Annotated[str, StringConstraints(min_length=1, max_length=72)]
+    new_password: Password
+
+
+class ProfileUpdateResult(BaseModel):
+    profile: Profile
+    reapproval_required: bool
+
+
 class RejectRequest(_Strict):
     reason: Annotated[str, StringConstraints(strip_whitespace=True, min_length=3, max_length=500)]
 
@@ -68,3 +87,6 @@ class Session(BaseModel):
     refresh_token: str
     expires_at: int
     profile: Profile
+
+
+ProfileUpdateResult.model_rebuild()

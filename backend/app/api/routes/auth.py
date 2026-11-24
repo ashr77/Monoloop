@@ -9,7 +9,17 @@ from __future__ import annotations
 from fastapi import APIRouter, Request, status
 
 from app.api.deps import ContainerDep
-from app.schemas.auth import LoginRequest, Profile, RefreshRequest, ResubmitRequest, Session, SignupRequest
+from app.schemas.auth import (
+    LoginRequest,
+    PasswordChange,
+    Profile,
+    ProfileUpdate,
+    ProfileUpdateResult,
+    RefreshRequest,
+    ResubmitRequest,
+    Session,
+    SignupRequest,
+)
 from app.schemas.common import ApiResponse, ok
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -41,3 +51,16 @@ async def me(request: Request, c: ContainerDep):
 async def resubmit(body: ResubmitRequest, request: Request, c: ContainerDep):
     """A rejected company corrects its details and goes back to PENDING."""
     return ok(await c.auth.resubmit(await c.auth.identity(request), body))
+
+
+@router.patch("/profile", response_model=ApiResponse[ProfileUpdateResult])
+async def update_profile(body: ProfileUpdate, request: Request, c: ContainerDep):
+    """Update the company's details. A new name or licence number needs admin re-approval."""
+    return ok(await c.auth.update_profile(await c.auth.identity(request), body))
+
+
+@router.post("/password", response_model=ApiResponse[dict])
+async def change_password(body: PasswordChange, request: Request, c: ContainerDep):
+    """Change the account password (the current password is checked first)."""
+    await c.auth.change_password(await c.auth.identity(request), body)
+    return ok({"changed": True})
