@@ -8,6 +8,7 @@ import { useMemo } from 'react';
 import { ArrowUpDown, ArrowUpRight } from 'lucide-react';
 import { useMatchesOverview } from '@/hooks';
 import { errorMessage } from '@/lib/api/client';
+import { useIdentity } from '@/lib/auth/AuthProvider';
 import { requirementSize } from '@/lib/dimensions';
 import type { MatchOverviewRow as Row } from '@/lib/api/endpoints';
 import { usePersistentState, useIncremental, sortBy } from '@/hooks/useViewPrefs';
@@ -78,6 +79,9 @@ function sortRows(rows: Row[], key: SortKey): Row[] {
 
 export function MatchesOverview() {
   const query = useMatchesOverview();
+  const identity = useIdentity();
+  // Signed-in companies get only their own requirements from the API; admins and demo mode see all.
+  const own = identity.locked && !identity.isAdmin;
   const [filter, setFilter] = usePersistentState<Filter>('matches.filter', 'all');
   const [sort, setSort] = usePersistentState<SortKey>('matches.sort', 'allocated');
 
@@ -110,26 +114,45 @@ export function MatchesOverview() {
       <div className="page-shell space-y-8 pb-16">
         <header className="space-y-4 border-b rule pb-10 pt-10 sm:pt-12">
           <h1 className="text-heading-lg font-medium sm:text-display-md">
-            {fulfilled} of {rows.length} open requirements
-            <br />
-            <span className="text-slate-500">can be fulfilled right now.</span>
+            {rows.length === 0 ? (
+              own ? 'Your matches' : 'Matching'
+            ) : (
+              <>
+                {own ? `${fulfilled} of your ${rows.length} open requirements` : `${fulfilled} of ${rows.length} open requirements`}
+                <br />
+                <span className="text-slate-500">can be fulfilled right now.</span>
+              </>
+            )}
           </h1>
           <p className="max-w-prose text-[15px] leading-relaxed text-slate-600">
-            Every open requirement is checked against current surplus stock. Open one to see the allocation and why each listing was
-            accepted or rejected.
+            {own
+              ? 'Each of your open requirements is checked against all surplus stock on the network. Open one to see the allocation and why each listing was accepted or rejected.'
+              : 'Every open requirement is checked against current surplus stock. Open one to see the allocation and why each listing was accepted or rejected.'}
           </p>
         </header>
 
         {rows.length === 0 ? (
-          <EmptyState
-            title="No open requirements"
-            description="Buyers publish requirements on the demand page."
-            action={
-              <LinkButton href="/demand" variant="ink">
-                Go to demand
-              </LinkButton>
-            }
-          />
+          own ? (
+            <EmptyState
+              title="You have no open requirements yet"
+              description="Post what your production needs. Meguri checks it against every surplus listing and shows the matches here."
+              action={
+                <LinkButton href="/demand?compose=1" variant="ink">
+                  Post a requirement
+                </LinkButton>
+              }
+            />
+          ) : (
+            <EmptyState
+              title="No open requirements"
+              description="Buyers publish requirements on the demand page."
+              action={
+                <LinkButton href="/demand" variant="ink">
+                  Go to demand
+                </LinkButton>
+              }
+            />
+          )
         ) : (
           <section aria-label="Open requirements" className="space-y-4">
             <Toolbar className="justify-between gap-3">

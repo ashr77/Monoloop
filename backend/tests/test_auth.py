@@ -278,3 +278,27 @@ async def test_impact_is_admin_only_with_login(jwt_client):
 
 async def test_impact_stays_public_in_demo_mode(client):
     assert (await client.get("/api/impact")).status_code == 200
+
+
+async def test_matches_overview_shows_only_own_requirements_with_login(jwt_client):
+    s = await approved_company(jwt_client)
+    org_id = s["profile"]["organization"]["id"]
+    # A new company has no requirements: an empty list, not other buyers' data.
+    r = await jwt_client.get("/api/matches", headers=bearer(s))
+    assert r.status_code == 200 and r.json()["data"] == []
+
+    body = {"organization_id": org_id, "material_family": "STAINLESS_STEEL_SHEET", "material_specification": "SS304", "length_mm": 2400,
+            "width_mm": 1200, "thickness_mm": 1.5, "required_quantity": 10, "quantity_unit": "PIECE"}
+    created = await jwt_client.post("/api/requirements", json=body, headers=bearer(s))
+    assert created.status_code == 201, created.text
+    rows = (await jwt_client.get("/api/matches", headers=bearer(s))).json()["data"]
+    assert [row["requirement"]["organization_id"] for row in rows] == [org_id]
+
+    admin_rows = (await jwt_client.get("/api/matches", headers=bearer(await admin_session(jwt_client)))).json()["data"]
+    assert len(admin_rows) > 1 and org_id in {row["requirement"]["organization_id"] for row in admin_rows}
+    assert (await jwt_client.get("/api/matches")).status_code == 401
+
+
+async def test_matches_overview_shows_everything_in_demo_mode(client):
+    rows = (await client.get("/api/matches")).json()["data"]
+    assert len({row["requirement"]["organization_id"] for row in rows}) > 1

@@ -36,9 +36,9 @@ class MatchingService:
         result = run_matching(req, listings, await self._buyer(req))
         return MatchOutcome("OK", req, result)
 
-    async def match_all_open(self) -> list[tuple[Requirement, MatchResult]]:
-        """Overview: every open requirement in 2 queries total (not 1 + 2·N)."""
-        open_reqs = await self.repos.requirements.list(RequirementFilter(status="OPEN"))
+    async def match_all_open(self, organization_id: str | None = None) -> list[tuple[Requirement, MatchResult]]:
+        """Overview: every open requirement (or one buyer's) in 2 queries total (not 1 + 2·N)."""
+        open_reqs = await self.repos.requirements.list(RequirementFilter(organization_id=organization_id, status="OPEN"))
         if not open_reqs:
             return []
         families = tuple(sorted({r.material_family for r in open_reqs}))

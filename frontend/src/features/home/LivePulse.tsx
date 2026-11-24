@@ -4,8 +4,12 @@
 import { useListings, useMatchesOverview } from '@/hooks';
 import { Skeleton } from '@/components/ui';
 import { num } from '@/features/exchanges/components/format';
+import { useIdentity } from '@/lib/auth/AuthProvider';
 
 export function LivePulse() {
+  const identity = useIdentity();
+  // Signed-in companies only receive their own requirements from the API.
+  const own = identity.locked && !identity.isAdmin;
   const listings = useListings({ status: 'ACTIVE' });
   const overview = useMatchesOverview();
 
@@ -17,8 +21,8 @@ export function LivePulse() {
   const items: { label: string; value: string | null; loading: boolean; failed: boolean }[] = [
     { label: 'Active surplus listings', value: num(active.length), loading: listings.isPending, failed: listings.isError },
     { label: 'Pieces available now', value: num(pieces), loading: listings.isPending, failed: listings.isError },
-    { label: 'Open buyer requirements', value: num(rows.length), loading: overview.isPending, failed: overview.isError },
-    { label: 'Fulfillable right now', value: num(fulfillable), loading: overview.isPending, failed: overview.isError },
+    { label: own ? 'Your open requirements' : 'Open buyer requirements', value: num(rows.length), loading: overview.isPending, failed: overview.isError },
+    { label: own ? 'Yours fulfillable now' : 'Fulfillable right now', value: num(fulfillable), loading: overview.isPending, failed: overview.isError },
   ];
   const allFailed = listings.isError && overview.isError;
 
